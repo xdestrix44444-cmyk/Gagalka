@@ -1,6 +1,6 @@
-// Страница для просмотра всей колоды сразу: npm run dev, затем /deck.html
+// Страница для просмотра колоды: npm run dev, затем /deck.html
 import { DECK } from './deck'
-import { drawCardBack, drawCardFace } from './sprites'
+import { drawCardBack, drawCardFace, hasArt } from './sprites'
 
 const grid = document.getElementById('grid')!
 const add = (draw: (c: HTMLCanvasElement) => void, caption: string) => {
@@ -13,4 +13,4 @@ const add = (draw: (c: HTMLCanvasElement) => void, caption: string) => {
   grid.append(fig)
 }
 add(drawCardBack, 'Рубашка')
-for (const c of DECK) add((canvas) => drawCardFace(canvas, c.id), `${c.numeral} ${c.name}`)
+for (const c of DECK) if (hasArt(c.id)) add((canvas) => drawCardFace(canvas, c.id), `${c.numeral} ${c.name}`)

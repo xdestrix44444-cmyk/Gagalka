@@ -1,4 +1,4 @@
-import { DECK, type Arcana } from './deck'
+import { ACTIVE_DECK, type Arcana } from './deck'
 
 /** Источник случайных чисел в [0, 1). Подменяется в тестах. */
 export type Rng = () => number
@@ -10,9 +10,9 @@ export const cryptoRng: Rng = () => {
 }
 
 /** Выбирает n разных карт; карты вытягивает код, а не ИИ. */
-export function drawCards(n: number, rng: Rng = cryptoRng): Arcana[] {
-  if (n < 0 || n > DECK.length) throw new RangeError(`Нельзя вытянуть ${n} карт`)
-  const pool = [...DECK]
+export function drawCards(n: number, rng: Rng = cryptoRng, deck: readonly Arcana[] = ACTIVE_DECK): Arcana[] {
+  if (n < 0 || n > deck.length) throw new RangeError(`Нельзя вытянуть ${n} карт`)
+  const pool = [...deck]
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1))
     ;[pool[i], pool[j]] = [pool[j], pool[i]]

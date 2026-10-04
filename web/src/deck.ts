@@ -138,3 +138,7 @@ export const DECK: readonly Arcana[] = [
     text: 'Большой этап закончен, и всё собралось. Остановитесь на минуту и признайте, сколько вы прошли. Новая сборка начнётся, когда вы будете готовы.',
   },
 ]
+
+/** Карты, дизайн которых уже нарисован и ждёт утверждения. Остальные подключим после. */
+export const ACTIVE_IDS: readonly number[] = [0, 1, 2, 16, 18]
+export const ACTIVE_DECK: readonly Arcana[] = DECK.filter((c) => ACTIVE_IDS.includes(c.id))

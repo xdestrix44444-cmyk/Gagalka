@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DECK } from './deck'
+import { ACTIVE_DECK, DECK } from './deck'
 import { dayKey, drawCards } from './draw'
 
 describe('drawCards', () => {
@@ -10,8 +10,8 @@ describe('drawCards', () => {
   })
 
   it('может вытянуть всю колоду без повторов', () => {
-    const cards = drawCards(DECK.length)
-    expect(new Set(cards.map((c) => c.id)).size).toBe(DECK.length)
+    const cards = drawCards(ACTIVE_DECK.length)
+    expect(new Set(cards.map((c) => c.id)).size).toBe(ACTIVE_DECK.length)
   })
 
   it('с одним и тем же генератором даёт тот же результат', () => {
@@ -23,7 +23,7 @@ describe('drawCards', () => {
   })
 
   it('не позволяет вытянуть больше карт, чем в колоде', () => {
-    expect(() => drawCards(DECK.length + 1)).toThrow(RangeError)
+    expect(() => drawCards(ACTIVE_DECK.length + 1)).toThrow(RangeError)
   })
 })
 
@@ -35,6 +35,10 @@ describe('dayKey', () => {
 })
 
 describe('колода', () => {
+  it('в игре сейчас только карты с утверждаемым дизайном', () => {
+    expect(ACTIVE_DECK.map((c) => c.id)).toEqual([0, 1, 2, 16, 18])
+  })
+
   it('содержит 22 старших аркана с уникальными номерами', () => {
     expect(DECK).toHaveLength(22)
     expect(new Set(DECK.map((c) => c.id)).size).toBe(22)
