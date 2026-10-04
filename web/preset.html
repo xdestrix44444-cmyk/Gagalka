@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Шаблон «Нить»: картинка → карта</title>
+    <style>
+      body { margin: 0; padding: 16px; background: #0a0a0b; color: #e8e6e0; font: 13px system-ui; display: flex; gap: 16px; flex-wrap: wrap; align-items: start; }
+      canvas, img { width: 320px; image-rendering: pixelated; display: block; }
+    </style>
+  </head>
+  <body>
+    <!-- открыть /preset.html?src=/картинка.jpg&top=XVIII&name=ЛУНА -->
+    <canvas id="card"></canvas>
+    <script type="module">
+      import { presetFromImage } from '/src/art/preset.ts'
+      const q = new URLSearchParams(location.search)
+      const img = new Image()
+      img.onload = () => presetFromImage(document.getElementById('card'), img, q.get('top') ?? '0', q.get('name') ?? 'ПРОБА')
+      img.src = q.get('src') ?? ''
+    </script>
+  </body>
+</html>
