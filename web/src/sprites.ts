@@ -3,7 +3,10 @@
 // позже арт можно заменить рисунками художника.
 
 import { Art, H, W, cornerOrnaments, frame } from './art/canvas'
-import { CORRUPT_SCENES, SCENES, cardBack } from './art/scenes'
+import { CORRUPT_SCENES, SCENES as SCENES1, cardBack } from './art/scenes'
+import { SCENES2 } from './art/scenes2'
+
+const SCENES: Record<number, (a: Art) => void> = { ...SCENES1, ...SCENES2 }
 
 export { H, W }
 

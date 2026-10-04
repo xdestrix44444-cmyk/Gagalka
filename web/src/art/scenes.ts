@@ -167,7 +167,7 @@ function cardZero(a: Art) {
 }
 
 
-function flame(a: Art, x: number, y: number, h: number, w: number, seed = 0) {
+export function flame(a: Art, x: number, y: number, h: number, w: number, seed = 0) {
   const layers: [string, number][] = [['#c4161c', 1], ['#e8541f', 0.8], ['#f6a22a', 0.58], ['#ffe27a', 0.34], ['#fff6d0', 0.16]]
   for (const [c, k] of layers) {
     const pts: [number, number][] = [[x - (w / 2) * k, y]]
@@ -188,7 +188,7 @@ function flame(a: Art, x: number, y: number, h: number, w: number, seed = 0) {
   a.glow(x, y - h * 0.4, w + 8, hex('#ff8a30'), 0.5, h * 0.7)
 }
 
-function drip(a: Art, x: number, y: number, len: number) {
+export function drip(a: Art, x: number, y: number, len: number) {
   a.line(x, y, x, y + len, hex('#b01820'), 1, false)
   a.rect(x - 1, y + len, 3, 2, hex('#e0303c'), false)
   a.set(x, y + 1, hex('#ff7a80'), false)
