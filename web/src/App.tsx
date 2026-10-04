@@ -1,14 +1,26 @@
 import { useMemo, useState } from 'react'
-import { DECK } from './deck'
-import { THREE_CARD_POSITIONS, dayKey, drawCards } from './draw'
+import { CREEP_LABEL, CREEP_LEVELS, rollCorrupt, type CreepLevel } from './creep'
+import { CORRUPT_TOTAL, DECK } from './deck'
+import { THREE_CARD_POSITIONS, cryptoRng, dayKey, drawCards } from './draw'
 import { PixelCard } from './PixelCard'
 import { Reading } from './Reading'
-import { loadDayCard, loadHistory, saveDayCard, saveHistoryEntry } from './storage'
+import { foundCorrupt, loadCreepLevel, loadDayCard, loadHistory, saveCreepLevel, saveDayCard, saveHistoryEntry } from './storage'
 import { haptic, initTelegram } from './telegram'
 
 type Screen = 'home' | 'spread' | 'diary'
 
 const tg = initTelegram()
+
+/** Бросает кубик «повреждённости» для карты; предыдущей считается последняя карта дневника. */
+function rollFor(cardId: number, previousCardId: number | null): boolean {
+  if (!DECK[cardId].corrupt) return false
+  return rollCorrupt({ date: new Date(), previousCardId, cardId, level: loadCreepLevel() }, cryptoRng)
+}
+
+function lastCardId(): number | null {
+  const last = loadHistory()[0]
+  return last ? last.cards[last.cards.length - 1] : null
+}
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('home')
@@ -32,15 +44,20 @@ export function App() {
 
 function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void }) {
   const today = useMemo(() => dayKey(), [])
-  const [cardId, setCardId] = useState<number | null>(() => loadDayCard(today))
+  const [day, setDay] = useState(() => loadDayCard(today))
+  const [level, setLevel] = useState<CreepLevel>(loadCreepLevel)
+  const cardId = day ? day.cardId : null
 
   const reveal = () => {
     if (cardId !== null) return
     haptic()
     const [card] = drawCards(1)
-    saveDayCard(today, card.id)
-    saveHistoryEntry({ kind: 'day', cards: [card.id] })
-    setCardId(card.id)
+    const corrupt = rollFor(card.id, lastCardId())
+    if (corrupt) haptic('error')
+    const entry = { cardId: card.id, corrupt }
+    saveDayCard(today, entry)
+    saveHistoryEntry({ kind: 'day', cards: [card.id], corrupt: corrupt ? [card.id] : [] })
+    setDay(entry)
   }
 
   const card = cardId === null ? null : DECK[cardId]
@@ -49,9 +66,27 @@ function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void
       <h1>{tg.firstName ? `Привет, ${tg.firstName}` : 'Привет'}</h1>
       <p className="lede">Карта дня. Подумайте о том, что сегодня для вас важно, и откройте карту.</p>
       <div className="stage single">
-        <PixelCard id={cardId} label={card ? `Карта дня: ${card.name}` : 'Карта дня, рубашка. Нажмите, чтобы открыть'} onClick={card ? undefined : reveal} />
-        {card && <Reading card={card} />}
+        <PixelCard id={cardId} corrupt={day?.corrupt} label={card ? `Карта дня: ${card.name}${day?.corrupt ? ' (повреждённая версия)' : ''}` : 'Карта дня, рубашка. Нажмите, чтобы открыть'} onClick={card ? undefined : reveal} />
+        {card && <Reading card={card} corrupt={day?.corrupt} />}
         {!card && <p className="hint">Нажмите на карту</p>}
+      </div>
+      <div className="creep">
+        <span id="creep-label">Жуть</span>
+        <div className="seg" role="group" aria-labelledby="creep-label">
+          {CREEP_LEVELS.map((l) => (
+            <button
+              key={l}
+              type="button"
+              aria-pressed={level === l}
+              onClick={() => {
+                setLevel(l)
+                saveCreepLevel(l)
+              }}
+            >
+              {CREEP_LABEL[l]}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="actions">
         <button type="button" className="btn primary" onClick={onSpread}>
@@ -66,7 +101,19 @@ function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void
 }
 
 function Spread({ onBack }: { onBack: () => void }) {
-  const [cards, setCards] = useState(() => drawCards(3))
+  const deal = () => {
+    const drawn = drawCards(3)
+    let prev = lastCardId()
+    const flags = drawn.map((c) => {
+      const f = rollFor(c.id, prev)
+      prev = c.id
+      return f
+    })
+    return { drawn, flags }
+  }
+  const [dealt, setDealt] = useState(deal)
+  const cards = dealt.drawn
+  const flags = dealt.flags
   const [open, setOpen] = useState<boolean[]>([false, false, false])
   const allOpen = open.every(Boolean)
 
@@ -75,11 +122,13 @@ function Spread({ onBack }: { onBack: () => void }) {
     haptic()
     const next = open.map((v, k) => (k === i ? true : v))
     setOpen(next)
-    if (next.every(Boolean)) saveHistoryEntry({ kind: 'three', cards: cards.map((c) => c.id) })
+    if (flags[i]) haptic('error')
+    if (next.every(Boolean))
+      saveHistoryEntry({ kind: 'three', cards: cards.map((c) => c.id), corrupt: cards.filter((_, k) => flags[k]).map((c) => c.id) })
   }
 
   const again = () => {
-    setCards(drawCards(3))
+    setDealt(deal())
     setOpen([false, false, false])
   }
 
@@ -92,6 +141,7 @@ function Spread({ onBack }: { onBack: () => void }) {
           <figure key={`${c.id}-${i}`} className="slot">
             <PixelCard
               id={open[i] ? c.id : null}
+              corrupt={flags[i]}
               label={open[i] ? `${THREE_CARD_POSITIONS[i]}: ${c.name}` : `${THREE_CARD_POSITIONS[i]}, рубашка. Нажмите, чтобы открыть`}
               onClick={open[i] ? undefined : () => flip(i)}
             />
@@ -106,7 +156,7 @@ function Spread({ onBack }: { onBack: () => void }) {
         {cards.map(
           (c, i) =>
             open[i] && (
-              <Reading key={`${c.id}-${i}`} card={c} position={THREE_CARD_POSITIONS[i]} />
+              <Reading key={`${c.id}-${i}`} card={c} corrupt={flags[i]} position={THREE_CARD_POSITIONS[i]} />
             ),
         )}
       </div>
@@ -126,10 +176,12 @@ function Spread({ onBack }: { onBack: () => void }) {
 
 function Diary({ onBack }: { onBack: () => void }) {
   const history = useMemo(() => loadHistory(), [])
+  const found = useMemo(() => foundCorrupt(history), [history])
   const fmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
   return (
     <section className="screen">
       <h1>Дневник</h1>
+      <p className="found">Найдено повреждённых: {found.size} из {CORRUPT_TOTAL}</p>
       {history.length === 0 ? (
         <p className="lede">Здесь появятся ваши расклады. Откройте карту дня или сделайте первый расклад.</p>
       ) : (
@@ -138,7 +190,15 @@ function Diary({ onBack }: { onBack: () => void }) {
             <li key={h.id}>
               <span className="when">{fmt.format(h.at)}</span>
               <span className="kind">{h.kind === 'day' ? 'Карта дня' : 'Три карты'}</span>
-              <span className="names">{h.cards.map((id) => DECK[id].name).join(', ')}</span>
+              <span className="names">
+                {h.cards.map((id, i) => (
+                  <span key={i} className={h.corrupt?.includes(id) ? 'bad' : undefined}>
+                    {i > 0 && ', '}
+                    {DECK[id].name}
+                    {h.corrupt?.includes(id) && ' (повреждённая)'}
+                  </span>
+                ))}
+              </span>
             </li>
           ))}
         </ul>

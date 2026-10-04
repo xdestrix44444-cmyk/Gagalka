@@ -153,6 +153,28 @@ export class Art {
     }
   }
 
+  /** «Повреждённый» вид: кровавый дуотон и тёмная виньетка. Яркие красные детали остаются. */
+  corrupt() {
+    const dark = hex('#0c0306')
+    const light = hex('#c8786c')
+    for (let y = Y0; y < Y1; y++)
+      for (let x = X0; x < X1; x++) {
+        const i = (y * W + x) * 4
+        const r = this.d[i], g = this.d[i + 1], b = this.d[i + 2]
+        if (r > 190 && g < 110 && b < 110) continue
+        const l = (r * 0.3 + g * 0.55 + b * 0.15) / 255
+        const duo = mix(dark, light, Math.min(1, l * 1.1))
+        const dx = (x - W / 2) / ((X1 - X0) / 2)
+        const dy = (y - H / 2) / ((Y1 - Y0) / 2)
+        const v = Math.min(1, Math.hypot(dx, dy) * 0.9)
+        const q = Math.round(v * 5) / 5
+        const c = mix(mix([r, g, b], duo, 0.8), dark, q * q * 0.75)
+        this.d[i] = c[0]
+        this.d[i + 1] = c[1]
+        this.d[i + 2] = c[2]
+      }
+  }
+
   private inInner(i: number) {
     const x = i % W
     const y = (i / W) | 0

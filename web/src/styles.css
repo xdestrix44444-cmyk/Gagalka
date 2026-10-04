@@ -54,3 +54,17 @@ div.pcard-wrap { cursor: default; }
 .log .state.partial { color: #ffcf6b; }
 .log .state.damaged { color: #ff6b7a; }
 .reading .text { font-size: 1.02rem; }
+
+/* повреждённая версия карты */
+.pcard.face.corrupt { animation: flip .28s steps(4, end), flicker 3.2s steps(1, end) .4s infinite; }
+@keyframes flicker { 0%, 92%, 100% { filter: none; } 93% { filter: brightness(.55) contrast(1.3); } 95% { filter: none; } 96% { filter: brightness(.7); } }
+@media (prefers-reduced-motion: reduce) { .pcard.face.corrupt { animation: none; } }
+.reading.corrupt .log { color: #ff6b7a; }
+.reading.corrupt h2 { color: #ff6b7a; }
+.creep { display: grid; gap: 6px; margin-top: 4px; font-size: .8rem; color: var(--muted); }
+.creep .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.creep .seg button { all: unset; box-sizing: border-box; text-align: center; cursor: pointer; padding: 8px 4px; border: 2px solid var(--line); background: var(--surface); }
+.creep .seg button[aria-pressed='true'] { border-color: var(--gold); color: var(--gold); }
+.creep .seg button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.found { color: #ff6b7a; font-size: .9rem; margin: 0 0 10px; }
+.diary .bad { color: #ff6b7a; }

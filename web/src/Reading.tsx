@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { INTEGRITY_LABEL, integrityState, type Arcana } from './deck'
+import { INTEGRITY_LABEL, integrityState, variantOf, type Arcana } from './deck'
 
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 /** Толкование в виде терминального лога: строки появляются по одной. */
-export function Reading({ card, position }: { card: Arcana; position?: string }) {
+export function Reading({ card: base, position, corrupt = false }: { card: Arcana; position?: string; corrupt?: boolean }) {
+  const card = variantOf(base, corrupt)
   const state = integrityState(card.integrity)
   const lines = [
     `загрузка ${card.file}${position ? ` · ${position.toLowerCase()}` : ''}`,
@@ -22,7 +23,7 @@ export function Reading({ card, position }: { card: Arcana; position?: string })
   }, [shown, total])
 
   return (
-    <article className="reading" aria-label={`${position ? position + ': ' : ''}${card.name}`}>
+    <article className={corrupt ? 'reading corrupt' : 'reading'} aria-label={`${position ? position + ': ' : ''}${card.name}`}>
       <div className="log" aria-hidden="true">
         {lines.slice(0, shown).map((line, i) => (
           <p key={i} className={i === 1 ? `state ${state}` : undefined}>

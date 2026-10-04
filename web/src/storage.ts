@@ -1,12 +1,17 @@
+import { CREEP_LEVELS, type CreepLevel } from './creep'
+
 export interface HistoryEntry {
   id: string
   at: number
   kind: 'day' | 'three'
   cards: number[]
+  /** Номера карт из cards, выпавших в повреждённой версии. */
+  corrupt?: number[]
 }
 
 const HISTORY_KEY = 'nit.history.v1'
 const DAY_KEY = 'nit.day.v1'
+const CREEP_KEY = 'nit.creep.v1'
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -35,11 +40,32 @@ export function saveHistoryEntry(entry: Omit<HistoryEntry, 'id' | 'at'>): Histor
   return full
 }
 
-export function loadDayCard(day: string): number | null {
-  const saved = read<{ day: string; cardId: number } | null>(DAY_KEY, null)
-  return saved && saved.day === day ? saved.cardId : null
+export interface DayCard {
+  cardId: number
+  corrupt: boolean
 }
 
-export function saveDayCard(day: string, cardId: number) {
-  write(DAY_KEY, { day, cardId })
+export function loadDayCard(day: string): DayCard | null {
+  const saved = read<{ day: string; cardId: number; corrupt?: boolean } | null>(DAY_KEY, null)
+  return saved && saved.day === day ? { cardId: saved.cardId, corrupt: !!saved.corrupt } : null
+}
+
+export function saveDayCard(day: string, card: DayCard) {
+  write(DAY_KEY, { day, ...card })
+}
+
+export function loadCreepLevel(): CreepLevel {
+  const v = read<string>(CREEP_KEY, 'normal')
+  return (CREEP_LEVELS as readonly string[]).includes(v) ? (v as CreepLevel) : 'normal'
+}
+
+export function saveCreepLevel(level: CreepLevel) {
+  write(CREEP_KEY, level)
+}
+
+/** Номера карт, которые уже выпадали в повреждённой версии. */
+export function foundCorrupt(history: HistoryEntry[]): Set<number> {
+  const found = new Set<number>()
+  for (const h of history) h.corrupt?.forEach((id) => found.add(id))
+  return found
 }

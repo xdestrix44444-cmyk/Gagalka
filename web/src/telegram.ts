@@ -4,7 +4,10 @@ interface TelegramWebApp {
   setHeaderColor?(color: string): void
   setBackgroundColor?(color: string): void
   initDataUnsafe?: { user?: { first_name?: string } }
-  HapticFeedback?: { impactOccurred(style: 'light' | 'medium' | 'heavy'): void }
+  HapticFeedback?: {
+    impactOccurred(style: 'light' | 'medium' | 'heavy'): void
+    notificationOccurred?(type: 'error' | 'success' | 'warning'): void
+  }
 }
 
 declare global {
@@ -23,6 +26,8 @@ export function initTelegram(): { firstName: string | null } {
   return { firstName: tg.initDataUnsafe?.user?.first_name ?? null }
 }
 
-export function haptic() {
-  window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light')
+export function haptic(kind: 'light' | 'error' = 'light') {
+  const h = window.Telegram?.WebApp?.HapticFeedback
+  if (kind === 'error') h?.notificationOccurred?.('error')
+  else h?.impactOccurred('light')
 }

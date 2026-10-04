@@ -458,6 +458,54 @@ function cardEighteen(a: Art) {
 }
 
 
+function bigEye(a: Art, cx: number, cy: number, rx: number, ry: number) {
+  a.glow(cx, cy, rx + 12, hex('#ff3040'), 0.55, ry + 10)
+  a.ellipse(cx, cy, rx, ry, (x, y) => tone(ramp('#e8dcc0'), 0.78 - Math.abs(y - cy) / ry * 0.45, x, y), false)
+  a.ellipse(cx, cy, ry, ry, sphere(ramp('#c42a3a'), cx - 2, cy - 2, ry), false)
+  a.rect(cx - 1, cy - ry + 1, 3, ry * 2 - 1, hex('#07020a'), false)
+  a.set(cx - 3, cy - 3, hex('#ffe8e8'), false)
+  for (let k = 0; k < 7; k++) a.line(cx - rx + 2 + k * 2, cy, cx - rx + 4 + k * 2, cy + (k % 2 ? 3 : -3), hex('#a01824'), 1, false)
+}
+
+function cardSixteenCorrupt(a: Art) {
+  cardSixteen(a)
+  // огромный глаз в грозовых тучах
+  bigEye(a, 38, 24, 22, 8)
+  // рот на башне: растянутая пасть с зубами
+  a.ellipse(65, 122, 17, 9, hex('#07020a'), false)
+  for (let i = 0; i < 11; i++) {
+    const x = 52 + i * 3
+    a.poly([[x, 114], [x + 3, 114], [x + 1.5, 120]], hex('#e8e0d8'), false)
+    a.poly([[x, 130], [x + 3, 130], [x + 1.5, 124]], hex('#e8e0d8'), false)
+  }
+  // окна кровоточат
+  for (const x of [57, 73]) {
+    a.rect(x - 2, 90, 6, 6, hex('#ff2a3a'), false)
+    drip(a, x, 98, 14)
+    drip(a, x + 2, 98, 8)
+  }
+  a.glow(65, 94, 30, hex('#ff2a3a'), 0.5, 40)
+  // фигуры падают без лиц
+  for (const [x, y] of [[26, 96], [104, 124]]) a.ellipse(x, y, 3, 3, hex('#07020a'))
+}
+
+function cardEighteenCorrupt(a: Art) {
+  cardEighteen(a)
+  // луна смотрит
+  bigEye(a, 64, 52, 24, 14)
+  // слёзы-кровь
+  drip(a, 54, 66, 14)
+  drip(a, 74, 66, 20)
+  // ряды красных глаз в тени гор
+  for (const [x, y] of [[20, 118], [44, 124], [92, 122], [112, 126], [26, 134], [100, 138]]) glowEyes(a, x, y, 4, '#ff3040', 0)
+  // тонкая фигура ближе, стоит спиной к дороге и всё равно смотрит
+  a.rect(62, 108, 4, 20, hex('#05030f'), false)
+  a.ellipse(64, 106, 4, 4, hex('#05030f'), false)
+  a.rect(60, 116, 2, 14, hex('#05030f'), false)
+  a.rect(66, 116, 2, 14, hex('#05030f'), false)
+  glowEyes(a, 64, 106, 3, '#ff3040', 0)
+}
+
 export function cardBack(a: Art) {
   const bg = gradient([[0, '#2a1a6a'], [1, '#150d3a']], Y0, Y1)
   a.rect(X0, Y0, X1 - X0, Y1 - Y0, (x, y) => {
@@ -503,6 +551,11 @@ export const SCENES: Record<number, (a: Art) => void> = {
   2: cardTwo,
   16: cardSixteen,
   18: cardEighteen,
+}
+
+export const CORRUPT_SCENES: Record<number, (a: Art) => void> = {
+  16: cardSixteenCorrupt,
+  18: cardEighteenCorrupt,
 }
 
 export { sky, starfield, ridge, glowEyes, head, SKIN, PALE, vgrad }

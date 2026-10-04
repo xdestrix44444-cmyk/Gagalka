@@ -63,3 +63,16 @@ describe('целостность карт', () => {
     }
   })
 })
+
+describe('повреждённые версии', () => {
+  it('у Башни и Луны есть повреждённая версия с логом и текстом', async () => {
+    const { CORRUPT_TOTAL, variantOf } = await import('./deck')
+    expect(CORRUPT_TOTAL).toBe(2)
+    for (const id of [16, 18]) {
+      const v = variantOf(DECK[id], true)
+      expect(v.log).toHaveLength(2)
+      expect(v.integrity).toBeLessThan(DECK[id].integrity)
+      expect(variantOf(DECK[id], false)).toBe(DECK[id])
+    }
+  })
+})

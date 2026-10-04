@@ -13,4 +13,8 @@ const add = (draw: (c: HTMLCanvasElement) => void, caption: string) => {
   grid.append(fig)
 }
 add(drawCardBack, 'Рубашка')
-for (const c of DECK) if (hasArt(c.id)) add((canvas) => drawCardFace(canvas, c.id), `${c.numeral} ${c.name}`)
+for (const c of DECK)
+  if (hasArt(c.id)) {
+    add((canvas) => drawCardFace(canvas, c.id), `${c.numeral} ${c.name}`)
+    if (c.corrupt) add((canvas) => drawCardFace(canvas, c.id, true), `${c.numeral} ${c.name} (повреждённая)`)
+  }
