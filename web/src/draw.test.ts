@@ -19,7 +19,7 @@ describe('drawCards', () => {
       let s = 7
       return () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646
     }
-    expect(drawCards(5, seq()).map((c) => c.id)).toEqual(drawCards(5, seq()).map((c) => c.id))
+    expect(drawCards(3, seq()).map((c) => c.id)).toEqual(drawCards(3, seq()).map((c) => c.id))
   })
 
   it('не позволяет вытянуть больше карт, чем в колоде', () => {
@@ -36,7 +36,7 @@ describe('dayKey', () => {
 
 describe('колода', () => {
   it('в игре сейчас только карты с утверждаемым дизайном', () => {
-    expect(ACTIVE_DECK.map((c) => c.id)).toEqual([0, 1, 2, 3, 4, 13, 16, 17, 18, 19])
+    expect(ACTIVE_DECK.map((c) => c.id)).toEqual([1, 13, 16, 18])
   })
 
   it('содержит 22 старших аркана с уникальными номерами', () => {

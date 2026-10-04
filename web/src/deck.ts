@@ -160,5 +160,5 @@ export function variantOf(card: Arcana, corrupt: boolean): Arcana {
   return corrupt && card.corrupt ? { ...card, ...card.corrupt } : card
 }
 
-export const ACTIVE_IDS: readonly number[] = [0, 1, 2, 3, 4, 13, 16, 17, 18, 19]
+export const ACTIVE_IDS: readonly number[] = [1, 13, 16, 18]
 export const ACTIVE_DECK: readonly Arcana[] = DECK.filter((c) => ACTIVE_IDS.includes(c.id))
