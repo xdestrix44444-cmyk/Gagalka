@@ -41,3 +41,21 @@ describe('колода', () => {
     DECK.forEach((c, i) => expect(c.id).toBe(i))
   })
 })
+
+describe('целостность карт', () => {
+  it('делит карты на цел / частично / повреждён', async () => {
+    const { integrityState } = await import('./deck')
+    expect(integrityState(100)).toBe('whole')
+    expect(integrityState(90)).toBe('whole')
+    expect(integrityState(75)).toBe('partial')
+    expect(integrityState(43)).toBe('damaged')
+  })
+
+  it('у каждой карты есть файл, две строки лога и текст', () => {
+    for (const c of DECK) {
+      expect(c.file).toMatch(/\.EXE$/)
+      expect(c.log).toHaveLength(2)
+      expect(c.text.length).toBeGreaterThan(40)
+    }
+  })
+})

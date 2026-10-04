@@ -1,8 +1,13 @@
-// Пиксельная колода, нарисованная кодом: 22 старших аркана на сетке 48×72.
-// Это набросок настроения. Позже колоду можно заменить на нарисованную художником.
+// Пиксельная колода, нарисованная кодом, в стиле «битой» игры: сетка 96×144,
+// мотивы рисуются на логической сетке 48×72 (пиксель ×2), затем проходят
+// обводку, дизеринг и глитч уже в полном разрешении, а поверх лежат «существа».
+// Это набросок настроения. Позже арт можно заменить на нарисованный художником.
 
-export const W = 48
-export const H = 72
+export const W = 96
+export const H = 144
+const LW = 48
+const LH = 72
+const S = 2
 
 const C = {
   ink: '#120e22',
@@ -27,14 +32,36 @@ const C = {
   flame: '#e8793a',
   wood: '#7a5a2a',
   gray: '#8a8aa5',
+  blood: '#c4161c',
+  magenta: '#ff2bd6',
+  cyan: '#2bffe0',
+}
+
+function mulberry32(seed: number) {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function rgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
 class Pen {
-  constructor(private x: CanvasRenderingContext2D) {}
+  constructor(
+    private x: CanvasRenderingContext2D,
+    private s = S,
+  ) {}
 
   r(x: number, y: number, w: number, h: number, c: string) {
     this.x.fillStyle = c
-    this.x.fillRect(x, y, w, h)
+    this.x.fillRect(x * this.s, y * this.s, w * this.s, h * this.s)
   }
 
   p(x: number, y: number, c: string) {
@@ -83,14 +110,18 @@ class Pen {
     for (let i = 0; i < h; i++) this.r(cx - i, top + i, 2 * i + 1, 1, c)
   }
 
-  /** Фигурка человека: голова, плечи, ряса, расширяющаяся книзу. */
+  /** Фигурка человека: голова с пустыми глазами, плечи, ряса, расширяющаяся книзу. */
   person(cx: number, top: number, robe: string, small = false) {
     const head = small ? 2 : 3
     const rows = small ? 9 : 20
     this.disc(cx, top + head, head, C.skin)
+    if (!small) {
+      this.p(cx - 1, top + head, C.ink)
+      this.p(cx + 1, top + head, C.ink)
+    }
     const bodyTop = top + head * 2 + 1
     for (let i = 0; i < rows; i++) {
-      const half = (small ? 2 : 3) + Math.floor(i / (small ? 4 : 4))
+      const half = (small ? 2 : 3) + Math.floor(i / 4)
       this.r(cx - half, bodyTop + i, half * 2 + 1, 1, robe)
     }
   }
@@ -99,7 +130,7 @@ class Pen {
     let s = seed
     for (let i = 0; i < count; i++) {
       s = (s * 9301 + 49297) % 233280
-      const x = 6 + Math.floor((s / 233280) * (W - 12))
+      const x = 6 + Math.floor((s / 233280) * (LW - 12))
       s = (s * 9301 + 49297) % 233280
       const y = 6 + Math.floor((s / 233280) * (yMax - 6))
       this.p(x, y, i % 3 ? C.violet2 : C.moon)
@@ -112,26 +143,206 @@ class Pen {
   }
 
   ground(y: number, c: string) {
-    this.r(4, y, W - 8, H - 4 - y, c)
+    this.r(4, y, LW - 8, LH - 4 - y, c)
   }
 }
 
+const INNER = { x0: 8, y0: 8, x1: W - 8, y1: H - 8 }
+
 function frame(x: CanvasRenderingContext2D, bg: string) {
-  const p = new Pen(x)
-  p.r(0, 0, W, H, C.ink)
-  p.r(1, 1, W - 2, H - 2, C.gold)
-  p.r(2, 2, W - 4, H - 4, C.ink)
-  p.r(3, 3, W - 6, H - 6, C.line)
+  const raw = new Pen(x, 1)
+  raw.r(0, 0, W, H, C.ink)
+  raw.r(2, 2, W - 4, H - 4, C.gold)
+  raw.r(4, 4, W - 8, H - 8, C.ink)
+  raw.r(6, 6, W - 12, H - 12, C.line)
   x.save()
   x.beginPath()
-  x.rect(4, 4, W - 8, H - 8)
+  x.rect(INNER.x0, INNER.y0, INNER.x1 - INNER.x0, INNER.y1 - INNER.y0)
   x.clip()
-  p.r(4, 4, W - 8, H - 8, bg)
-  return p
+  raw.r(INNER.x0, INNER.y0, INNER.x1 - INNER.x0, INNER.y1 - INNER.y0, bg)
+  return { p: new Pen(x), raw }
 }
 
 function corners(p: Pen) {
-  for (const [x, y] of [[5, 5], [W - 8, 5], [5, H - 8], [W - 8, H - 8]]) p.r(x, y, 3, 3, C.gold)
+  for (const [x, y] of [[5, 5], [LW - 8, 5], [5, LH - 8], [LW - 8, LH - 8]]) p.r(x, y, 3, 3, C.gold)
+}
+
+// ---------- «существа»: оригинальные образы в духе .exe-крипипаст ----------
+
+type Entity = 'eyes' | 'smile' | 'tears' | 'faceless' | 'staticFace' | 'errorWin'
+
+const entities: Record<Entity, (p: Pen, x: number, y: number, seed: number) => void> = {
+  // Красные глаза из пустоты.
+  eyes(p, x, y) {
+    p.r(x, y, 22, 9, C.ink)
+    p.r(x + 3, y + 3, 4, 3, C.blood)
+    p.r(x + 15, y + 3, 4, 3, C.blood)
+    p.p(x + 4, y + 4, '#ffd0d0')
+    p.p(x + 16, y + 4, '#ffd0d0')
+  },
+  // Слишком широкая улыбка.
+  smile(p, x, y) {
+    p.r(x, y, 34, 12, C.ink)
+    for (let i = 0; i < 10; i++) p.r(x + 3 + i * 3, y + 3, 2, 3, C.paper)
+    for (let i = 0; i < 9; i++) p.r(x + 4 + i * 3, y + 7, 2, 3, C.paper)
+    p.r(x + 1, y + 2, 2, 2, C.paper)
+    p.r(x + 31, y + 2, 2, 2, C.paper)
+  },
+  // Красные потёки.
+  tears(p, x, y) {
+    for (let i = 0; i < 5; i++) {
+      const len = 8 + ((i * 7) % 15)
+      p.r(x + i * 3, y, 1, len, C.blood)
+      p.r(x + i * 3 - 1, y + len, 3, 2, C.blood)
+    }
+  },
+  // Безликая высокая фигура.
+  faceless(p, x, y) {
+    p.r(x + 2, y + 8, 4, 28, C.ink)
+    p.r(x, y + 12, 1, 18, C.ink)
+    p.r(x + 7, y + 12, 1, 18, C.ink)
+    p.disc(x + 4, y + 4, 4, '#cfc8d8')
+  },
+  // Лицо из помех.
+  staticFace(p, x, y, seed) {
+    const rnd = mulberry32(seed)
+    for (let j = 0; j < 16; j++)
+      for (let i = 0; i < 14; i++) {
+        const g = 70 + Math.floor(rnd() * 150)
+        p.p(x + i, y + j, `rgb(${g},${g},${g})`)
+      }
+    p.r(x + 3, y + 5, 2, 3, C.ink)
+    p.r(x + 9, y + 5, 2, 3, C.ink)
+    p.r(x + 3, y + 11, 8, 1, C.ink)
+  },
+  // Окошко «программа не отвечает».
+  errorWin(p, x, y) {
+    p.r(x, y, 28, 18, '#c0c0c8')
+    p.r(x, y, 28, 4, '#1a2a8a')
+    p.r(x + 23, y + 1, 4, 2, '#c02020')
+    p.r(x + 3, y + 7, 6, 6, '#c02020')
+    p.r(x + 4, y + 8, 1, 1, '#fff')
+    p.r(x + 7, y + 8, 1, 1, '#fff')
+    p.r(x + 5, y + 9, 2, 2, '#fff')
+    p.r(x + 4, y + 11, 1, 1, '#fff')
+    p.r(x + 7, y + 11, 1, 1, '#fff')
+    p.r(x + 11, y + 8, 14, 1, '#444')
+    p.r(x + 11, y + 11, 10, 1, '#444')
+    p.r(x + 9, y + 14, 10, 3, '#e0e0e8')
+  },
+}
+
+/** Какое существо живёт на какой карте и где (координаты на сетке 96×144). */
+const placements: Record<number, [Entity, number, number]> = {
+  0: ['smile', 12, 114],
+  1: ['eyes', 60, 12],
+  2: ['tears', 44, 40],
+  3: ['faceless', 70, 70],
+  4: ['staticFace', 58, 110],
+  5: ['errorWin', 56, 100],
+  6: ['eyes', 12, 112],
+  7: ['faceless', 66, 96],
+  8: ['smile', 8, 118],
+  9: ['eyes', 56, 16],
+  10: ['errorWin', 34, 118],
+  11: ['tears', 60, 30],
+  12: ['staticFace', 60, 44],
+  13: ['faceless', 70, 86],
+  14: ['eyes', 10, 14],
+  15: ['smile', 50, 114],
+  16: ['errorWin', 10, 76],
+  17: ['faceless', 60, 80],
+  18: ['eyes', 56, 62],
+  19: ['staticFace', 68, 96],
+  20: ['tears', 20, 60],
+  21: ['smile', 24, 118],
+}
+
+// ---------- постобработка: обводка, дизеринг, глитч ----------
+
+interface PostOptions {
+  outline: boolean
+  shade: boolean
+  seed: number
+}
+
+function postprocess(x: CanvasRenderingContext2D, bg: string, o: PostOptions) {
+  const { x0, y0, x1, y1 } = INNER
+  const img = x.getImageData(0, 0, W, H)
+  const d = img.data
+  const src = new Uint8ClampedArray(d)
+  const [br, bgc, bb] = rgb(bg)
+  const [ir, ig, ib] = rgb(C.ink)
+  const mask = new Uint8Array(W * H)
+  for (let y = y0; y < y1; y++)
+    for (let xx = x0; xx < x1; xx++) {
+      const i = (y * W + xx) * 4
+      mask[y * W + xx] = src[i] === br && src[i + 1] === bgc && src[i + 2] === bb ? 0 : 1
+    }
+  const inside = (xx: number, y: number) => xx >= x0 && xx < x1 && y >= y0 && y < y1
+  const m = (xx: number, y: number) => (inside(xx, y) ? mask[y * W + xx] : 0)
+
+  for (let y = y0; y < y1; y++)
+    for (let xx = x0; xx < x1; xx++) {
+      const i = (y * W + xx) * 4
+      if (!m(xx, y)) {
+        if (o.outline && (m(xx - 1, y) || m(xx + 1, y) || m(xx, y - 1) || m(xx, y + 1))) {
+          d[i] = ir
+          d[i + 1] = ig
+          d[i + 2] = ib
+        }
+      } else if (o.shade && (xx + y) % 2 === 0 && (!m(xx + 1, y) || !m(xx, y + 1))) {
+        d[i] = src[i] * 0.68
+        d[i + 1] = src[i + 1] * 0.68
+        d[i + 2] = src[i + 2] * 0.68
+      }
+    }
+
+  // Глитч: сдвинутые горизонтальные полосы с расщеплением красного канала.
+  const rnd = mulberry32(o.seed * 7919 + 13)
+  const bands = 3 + Math.floor(rnd() * 3)
+  const row = new Uint8ClampedArray((x1 - x0) * 4)
+  for (let b = 0; b < bands; b++) {
+    const by = y0 + Math.floor(rnd() * (y1 - y0 - 5))
+    const bh = 1 + Math.floor(rnd() * 4)
+    const shift = (rnd() < 0.5 ? -1 : 1) * (3 + Math.floor(rnd() * 9))
+    for (let y = by; y < by + bh; y++) {
+      for (let xx = x0; xx < x1; xx++) {
+        const sx = x0 + ((xx - x0 - shift + (x1 - x0) * 4) % (x1 - x0))
+        const si = (y * W + sx) * 4
+        const ri = (y * W + Math.min(x1 - 1, Math.max(x0, sx + 2))) * 4
+        const o4 = (xx - x0) * 4
+        row[o4] = d[ri]
+        row[o4 + 1] = d[si + 1]
+        row[o4 + 2] = d[si + 2]
+        row[o4 + 3] = 255
+      }
+      for (let xx = x0; xx < x1; xx++) {
+        const i = (y * W + xx) * 4
+        const o4 = (xx - x0) * 4
+        d[i] = row[o4]
+        d[i + 1] = row[o4 + 1]
+        d[i + 2] = row[o4 + 2]
+      }
+    }
+  }
+  // Битые блоки.
+  const palette = [C.magenta, C.cyan, C.paper, C.ink]
+  for (let k = 0; k < 7; k++) {
+    const bx = x0 + Math.floor(rnd() * (x1 - x0 - 8))
+    const by = y0 + Math.floor(rnd() * (y1 - y0 - 4))
+    const bw = 2 + Math.floor(rnd() * 6)
+    const bh = 1 + Math.floor(rnd() * 3)
+    const [pr, pg, pb] = rgb(palette[Math.floor(rnd() * palette.length)])
+    for (let y = by; y < by + bh; y++)
+      for (let xx = bx; xx < bx + bw; xx++) {
+        const i = (y * W + xx) * 4
+        d[i] = pr
+        d[i + 1] = pg
+        d[i + 2] = pb
+      }
+  }
+  x.putImageData(img, 0, 0)
 }
 
 type Motif = (p: Pen) => void
@@ -368,7 +579,7 @@ const motifs: Record<number, { bg: string; draw: Motif }> = {
           const on = a + b <= 4 || (a <= 1 && b <= 13) || (b <= 1 && a <= 13) || (a <= 5 && b <= 5 && a * b <= 4 && a + b <= 9)
           if (on) p.p(24 + x, 28 + y, a + b <= 2 ? C.paper : C.gold)
         }
-      p.r(4, 52, W - 8, 16, C.water)
+      p.r(4, 52, LW - 8, 16, C.water)
       for (let x = 6; x < 42; x += 6) p.r(x, 56, 4, 1, C.moon)
       p.person(16, 40, C.skin, true)
     },
@@ -413,7 +624,7 @@ const motifs: Record<number, { bg: string; draw: Motif }> = {
       p.person(24, 8, C.paper)
       p.line(28, 18, 38, 14, C.gold)
       p.disc(39, 14, 3, C.gold)
-      p.r(4, 36, W - 8, 4, C.paper)
+      p.r(4, 36, LW - 8, 4, C.paper)
       for (const x of [10, 24, 38]) p.person(x, 46, C.stone, true)
     },
   },
@@ -435,13 +646,16 @@ const motifs: Record<number, { bg: string; draw: Motif }> = {
 export function drawCardFace(canvas: HTMLCanvasElement, id: number) {
   canvas.width = W
   canvas.height = H
-  const x = canvas.getContext('2d')
+  const x = canvas.getContext('2d', { willReadFrequently: true })
   const motif = motifs[id]
   if (!x || !motif) return
   x.imageSmoothingEnabled = false
-  const p = frame(x, motif.bg)
+  const { p, raw } = frame(x, motif.bg)
   motif.draw(p)
+  const place = placements[id]
+  if (place) entities[place[0]](raw, place[1], place[2], id + 1)
   x.restore()
+  postprocess(x, motif.bg, { outline: true, shade: true, seed: id + 1 })
   corners(p)
 }
 
@@ -449,17 +663,18 @@ export function drawCardFace(canvas: HTMLCanvasElement, id: number) {
 export function drawCardBack(canvas: HTMLCanvasElement) {
   canvas.width = W
   canvas.height = H
-  const x = canvas.getContext('2d')
+  const x = canvas.getContext('2d', { willReadFrequently: true })
   if (!x) return
   x.imageSmoothingEnabled = false
-  const p = frame(x, C.violet)
-  for (let y = 6; y < H - 6; y += 4)
-    for (let xx = 6; xx < W - 6; xx += 4) p.r(xx, y, 2, 2, ((xx + y) / 4) % 2 === 0 ? C.gold : C.violet2)
+  const { p } = frame(x, C.violet)
+  for (let y = 6; y < LH - 6; y += 4)
+    for (let xx = 6; xx < LW - 6; xx += 4) p.r(xx, y, 2, 2, ((xx + y) / 4) % 2 === 0 ? C.gold : C.violet2)
   p.r(15, 25, 18, 22, C.ink)
   p.r(16, 26, 16, 20, C.paper)
   p.r(22, 31, 4, 4, C.gold)
   p.r(20, 35, 8, 2, C.gold)
   p.r(22, 37, 4, 4, C.gold)
   x.restore()
+  postprocess(x, C.violet, { outline: false, shade: false, seed: 99 })
   corners(p)
 }

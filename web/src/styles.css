@@ -47,3 +47,20 @@ div.pcard-wrap { cursor: default; }
 .diary .kind { font-family: var(--pix); font-size: .55rem; color: var(--gold); line-height: 1.8; }
 .disclaimer { font-size: .75rem; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .pcard.face { animation: none; } }
+
+/* Терминальный лог толкования и «битая» плёнка на картах */
+.log { font-family: ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace; font-size: .78rem; line-height: 1.6; color: #7cffb2; display: grid; gap: 2px; margin-bottom: 10px; }
+.log .prompt { color: var(--muted); }
+.log .state.partial { color: #ffcf6b; }
+.log .state.damaged { color: #ff6b7a; }
+.reading .text { font-size: 1.02rem; }
+.pcard-wrap { position: relative; }
+.pcard-wrap::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px); }
+.pcard.face { animation: flip .28s steps(4, end), glitch 7s steps(1) .6s infinite; }
+@keyframes glitch {
+  0%, 90%, 100% { transform: none; filter: none; }
+  91% { transform: translateX(-3px); filter: hue-rotate(40deg); }
+  93% { transform: translateX(4px) skewX(3deg); }
+  95% { transform: none; filter: saturate(1.7) contrast(1.2); }
+}
+@media (prefers-reduced-motion: reduce) { .pcard.face { animation: none; } }

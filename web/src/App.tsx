@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { DECK } from './deck'
 import { THREE_CARD_POSITIONS, dayKey, drawCards } from './draw'
 import { PixelCard } from './PixelCard'
+import { Reading } from './Reading'
 import { loadDayCard, loadHistory, saveDayCard, saveHistoryEntry } from './storage'
 import { haptic, initTelegram } from './telegram'
 
@@ -49,14 +50,7 @@ function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void
       <p className="lede">Карта дня. Подумайте о том, что сегодня для вас важно, и откройте карту.</p>
       <div className="stage single">
         <PixelCard id={cardId} label={card ? `Карта дня: ${card.name}` : 'Карта дня, рубашка. Нажмите, чтобы открыть'} onClick={card ? undefined : reveal} />
-        {card && (
-          <div className="reading" aria-live="polite">
-            <h2>
-              {card.numeral} · {card.name}
-            </h2>
-            <p>{card.meaning}</p>
-          </div>
-        )}
+        {card && <Reading card={card} />}
         {!card && <p className="hint">Нажмите на карту</p>}
       </div>
       <div className="actions">
@@ -112,12 +106,7 @@ function Spread({ onBack }: { onBack: () => void }) {
         {cards.map(
           (c, i) =>
             open[i] && (
-              <article key={`${c.id}-${i}`} className="reading">
-                <h2>
-                  {THREE_CARD_POSITIONS[i]} · {c.name}
-                </h2>
-                <p>{c.meaning}</p>
-              </article>
+              <Reading key={`${c.id}-${i}`} card={c} position={THREE_CARD_POSITIONS[i]} />
             ),
         )}
       </div>
