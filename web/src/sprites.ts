@@ -14,6 +14,12 @@ export function hasArt(id: number) {
   return id in SCENES
 }
 
+export type CardStyle = 'color' | 'noir'
+let style: CardStyle = 'color'
+export function setCardStyle(s: CardStyle) {
+  style = s
+}
+
 function paint(canvas: HTMLCanvasElement, build: (a: Art) => void, corrupt = false) {
   canvas.width = W
   canvas.height = H
@@ -24,6 +30,7 @@ function paint(canvas: HTMLCanvasElement, build: (a: Art) => void, corrupt = fal
   build(a)
   a.outline()
   if (corrupt) a.corrupt()
+  if (style === 'noir') a.noir()
   cornerOrnaments(a)
   ctx.putImageData(new ImageData(a.d, W, H), 0, 0)
 }

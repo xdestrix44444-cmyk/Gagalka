@@ -175,6 +175,41 @@ export class Art {
       }
   }
 
+  /** Чёрно-белый стиль «ASCII-ужастик»: контраст, дизеринг до 5 серых, стекающие полосы, виньетка. */
+  noir() {
+    const lum = new Float32Array(W * H)
+    for (let y = Y0; y < Y1; y++)
+      for (let x = X0; x < X1; x++) {
+        const i = (y * W + x) * 4
+        const r = this.d[i], g = this.d[i + 1], b = this.d[i + 2]
+        let l = (r * 0.3 + g * 0.55 + b * 0.15) / 255
+        if (r > 190 && g < 110 && b < 110) l = 1
+        const dx = (x - W / 2) / ((X1 - X0) / 2)
+        const dy = (y - H / 2) / ((Y1 - Y0) / 2)
+        l = Math.pow(l, 0.8) * (1 - Math.min(1, Math.hypot(dx, dy) * 0.55) ** 2 * 0.5)
+        lum[y * W + x] = Math.min(1, Math.max(0, (l - 0.08) * 1.3))
+      }
+    // стекающие тёмные полосы от светлых мест
+    for (let x = X0; x < X1; x++) {
+      if (hash(x, 3, 77) > 0.07) continue
+      let y = Y0 + Math.floor(hash(x, 5, 78) * (Y1 - Y0 - 40))
+      const len = 12 + Math.floor(hash(x, 6, 79) * 34)
+      for (let k = 0; k < len && y + k < Y1; k++) lum[(y + k) * W + x] *= 0.35
+    }
+    const levels = 5
+    for (let y = Y0; y < Y1; y++)
+      for (let x = X0; x < X1; x++) {
+        const v = lum[y * W + x] * (levels - 1)
+        const lo = Math.floor(v)
+        const q = (bayer(x, y) < v - lo ? lo + 1 : lo) / (levels - 1)
+        const g = Math.round(14 + q * 232)
+        const i = (y * W + x) * 4
+        this.d[i] = g
+        this.d[i + 1] = g
+        this.d[i + 2] = Math.min(255, g + 3)
+      }
+  }
+
   private inInner(i: number) {
     const x = i % W
     const y = (i / W) | 0

@@ -1,6 +1,8 @@
 // Страница для просмотра колоды: npm run dev, затем /deck.html
 import { DECK } from './deck'
-import { drawCardBack, drawCardFace, hasArt } from './sprites'
+import { drawCardBack, drawCardFace, hasArt, setCardStyle } from './sprites'
+
+if (new URLSearchParams(location.search).get('style') === 'noir') setCardStyle('noir')
 
 const grid = document.getElementById('grid')!
 const add = (draw: (c: HTMLCanvasElement) => void, caption: string) => {

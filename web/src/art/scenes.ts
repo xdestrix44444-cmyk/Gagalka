@@ -8,6 +8,8 @@ interface FaceOpts {
   eyes?: 'open' | 'hollow' | 'closed' | 'red'
   mouth?: 'smile' | 'flat' | 'grin' | 'none'
   look?: number
+  mask?: 'porcelain' | 'venetian' | 'plague' | 'skull' | 'veil'
+  maskTone?: string
 }
 
 /** Лицо на затенённой сфере: глаза, брови, нос, рот, румянец. */
@@ -45,6 +47,52 @@ function head(a: Art, cx: number, cy: number, r: number, o: FaceOpts = {}) {
     a.line(cx - 2, my, cx + 2, my, hex('#7a2a38'))
   }
   for (const s of [-1, 1]) if (bayer(cx, cy) > 0.3) a.set(cx + s * (dx + 1), cy + 2, mix(skin[3], hex('#ff7a8a'), 0.4))
+  if (o.mask) mask(a, cx, cy, r, o.mask, o.maskTone)
+}
+
+/** Маска поверх лица: вместо мультяшных эмоций — безликий предмет со светящимися глазами. */
+function mask(a: Art, cx: number, cy: number, r: number, kind: NonNullable<FaceOpts['mask']>, tone0?: string) {
+  const dx = Math.round(r * 0.45)
+  const ey = cy - 1
+  const eyes = (col = '#fff6e0') => {
+    for (const s of [-1, 1]) {
+      a.rect(cx + s * dx - 2, ey - 1, 4, 2, hex('#05030a'))
+      a.set(cx + s * dx, ey - 1, hex(col))
+      a.set(cx + s * dx + (s > 0 ? -1 : 1), ey - 1, hex(col))
+    }
+  }
+  if (kind === 'porcelain') {
+    const m = ramp(tone0 ?? '#e8e4ec')
+    a.ellipse(cx, cy, r, r + 1, sphere(m, cx - 2, cy - 3, r, r + 1))
+    eyes()
+    a.line(cx, cy + 2, cx, cy + 3, m[1])
+    a.line(cx - 2, cy + Math.round(r * 0.6), cx + 2, cy + Math.round(r * 0.6), hex('#150d2e'))
+    a.line(cx + 2, cy - r + 2, cx + 4, cy + 3, m[1])
+  } else if (kind === 'venetian') {
+    const m = ramp(tone0 ?? '#c8962a')
+    a.rect(cx - r + 1, ey - 3, 2 * r - 1, 7, cylinder(m, cx - r, cx + r))
+    a.poly([[cx - 1, ey + 3], [cx + 1, ey + 3], [cx + 3, cy + r - 1], [cx - 3, cy + r - 1]], cylinder(m, cx - 3, cx + 3))
+    eyes('#ff3040')
+  } else if (kind === 'plague') {
+    const m = ramp(tone0 ?? '#3a3040')
+    a.ellipse(cx, cy - 1, r, r, sphere(m, cx - 2, cy - 3, r))
+    a.poly([[cx - 3, cy], [cx + 3, cy], [cx, cy + r + 7]], cylinder(m, cx - 3, cx + 3))
+    for (const s of [-1, 1]) {
+      a.ellipse(cx + s * dx, ey, 3, 3, hex('#05030a'))
+      a.set(cx + s * dx - 1, ey - 1, hex('#fff6e0'))
+    }
+  } else if (kind === 'skull') {
+    const m = ramp(tone0 ?? '#e8e0d0')
+    a.ellipse(cx, cy, r, r + 1, sphere(m, cx - 2, cy - 3, r, r + 1))
+    for (const s of [-1, 1]) a.ellipse(cx + s * dx, ey, 3, 3, hex('#05030a'))
+    a.rect(cx - 1, cy + 2, 2, 2, hex('#05030a'))
+    for (let i = -3; i <= 3; i += 2) a.rect(cx + i, cy + Math.round(r * 0.6), 1, 2, hex('#05030a'))
+  } else {
+    const m = ramp(tone0 ?? '#1a1428')
+    a.ellipse(cx, cy, r + 1, r + 2, cloth(m, cx - r, cx + r, 3, 1))
+    a.rect(cx - r + 1, ey - 2, 2 * r - 1, 5, hex('#05030a'))
+    eyes()
+  }
 }
 
 /** Горный хребет колонками: сверху снег, ниже тени. */
@@ -147,7 +195,7 @@ function cardZero(a: Art) {
   a.ellipse(90, 54, 1.5, 1.5, hex('#d03a4a'))
   // шея, голова, шапка
   a.rect(62, 80, 8, 6, cylinder(SKIN, 62, 70))
-  head(a, 66, 72, 9, { eyes: 'open', mouth: 'smile', look: 1 })
+  head(a, 66, 72, 9, { eyes: 'open', mouth: 'smile', look: 1, mask: 'venetian' })
   a.poly([[56, 66], [66, 53], [77, 66], [66, 62]], cloth(red, 56, 77, 2, 0.4))
   a.rect(56, 64, 21, 3, cylinder(gold, 56, 77))
   a.ellipse(66, 53, 3, 3, sphere(ramp('#f4efe6'), 65, 52, 3))
@@ -236,7 +284,7 @@ function cardOne(a: Art) {
   a.line(43, 119, 43, 124, hex('#e9b48a'), 1)
   // голова
   a.rect(60, 80, 8, 7, cylinder(SKIN, 60, 68))
-  head(a, 64, 72, 9, { eyes: 'open', mouth: 'smile' })
+  head(a, 64, 72, 9, { eyes: 'open', mouth: 'smile', mask: 'porcelain' })
   a.poly([[54, 70], [56, 60], [64, 56], [73, 60], [75, 70], [71, 63], [64, 61], [58, 63]], cloth(ramp('#5a3a2a'), 54, 75, 2, 0.3))
   a.rect(55, 62, 19, 2, cylinder(ramp('#c9962c'), 55, 74))
   // стол
@@ -313,7 +361,7 @@ function cardTwo(a: Art) {
   a.ellipse(73, 128, 3, 3, sphere(PALE, 72, 127, 3))
   // голова и корона-луна
   a.rect(61, 74, 6, 6, cylinder(PALE, 61, 67))
-  head(a, 64, 66, 9, { skin: PALE, eyes: 'closed', mouth: 'flat' })
+  head(a, 64, 66, 9, { skin: PALE, eyes: 'closed', mouth: 'flat', mask: 'veil', maskTone: '#e8e4ec' })
   a.ellipse(64, 53, 4, 4, sphere(ramp('#f4efd0'), 63, 52, 4))
   a.ellipse(56, 56, 4, 6, sphere(ramp('#f4efd0'), 54, 55, 4, 6))
   a.ellipse(72, 56, 4, 6, sphere(ramp('#f4efd0'), 70, 55, 4, 6))
