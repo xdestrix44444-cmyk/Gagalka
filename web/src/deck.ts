@@ -1,5 +1,9 @@
+import { RANKS, SUITS, type Suit } from './minor'
+
 export interface Arcana {
+  /** 0–21 старшие арканы, 22–77 младшие: жезлы, кубки, мечи, пентакли (туз … король). */
   id: number
+  /** Номинал на карте: римское число. */
   numeral: string
   name: string
   /** «Имя файла» карты в терминальном логе, например 16_БАШНЯ.EXE. */
@@ -12,6 +16,8 @@ export interface Arcana {
   text: string
   /** Редкая повреждённая версия карты: свои лог, целостность и текст. */
   corrupt?: { integrity: number; log: [string, string]; text: string }
+  /** Масть младшего аркана; у старших не задана. */
+  suit?: Suit
 }
 
 export type IntegrityState = 'whole' | 'partial' | 'damaged'
@@ -28,7 +34,7 @@ export const INTEGRITY_LABEL: Record<IntegrityState, string> = {
   damaged: 'ПОВРЕЖДЁН',
 }
 
-export const DECK: readonly Arcana[] = [
+const MAJOR: readonly Arcana[] = [
   {
     id: 0, numeral: '0', name: 'Шут', file: '00_ШУТ.EXE', integrity: 99,
     log: ['сектор 0: пусто. так и задумано', 'предупреждение: шаг без проверки'],
@@ -151,14 +157,31 @@ export const DECK: readonly Arcana[] = [
   },
 ]
 
-/** Карты, дизайн которых уже нарисован и ждёт утверждения. Остальные подключим после. */
-/** Сколько карт имеет повреждённую версию (знаменатель счётчика находок). */
-export const CORRUPT_TOTAL = DECK.filter((c) => c.corrupt).length
+
+const MINOR: Arcana[] = SUITS.flatMap(({ suit, name, file, rows }, si) =>
+  rows.map(([integrity, log1, log2, text], ri) => ({
+    id: 22 + si * 14 + ri,
+    numeral: RANKS[ri].numeral,
+    name: `${RANKS[ri].name} ${name}`,
+    file: `${file}_${RANKS[ri].file}.EXE`,
+    integrity,
+    log: [log1, log2],
+    text,
+    suit,
+  })),
+)
+
+/** Полная колода из 78 карт; индекс в массиве совпадает с id. */
+export const DECK: readonly Arcana[] = [...MAJOR, ...MINOR]
 
 /** Карта в том виде, в каком выпала: обычная или повреждённая. */
 export function variantOf(card: Arcana, corrupt: boolean): Arcana {
   return corrupt && card.corrupt ? { ...card, ...card.corrupt } : card
 }
 
-export const ACTIVE_IDS: readonly number[] = [1, 13, 16, 18]
+/** Карты, для которых есть рисунок в «карточках». Только они пока выпадают в раскладах. */
+export const ACTIVE_IDS: readonly number[] = [0, 5, 16, 17, 23, 42]
 export const ACTIVE_DECK: readonly Arcana[] = DECK.filter((c) => ACTIVE_IDS.includes(c.id))
+
+/** Сколько карт в игре имеет повреждённую версию (знаменатель счётчика находок). */
+export const CORRUPT_TOTAL = ACTIVE_DECK.filter((c) => c.corrupt).length

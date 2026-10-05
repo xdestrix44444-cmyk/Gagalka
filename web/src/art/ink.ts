@@ -263,10 +263,12 @@ function px(d: Uint8ClampedArray, x: number, y: number, g: number) {
 }
 
 /** Текст пиксельной маской: рисуем шрифтом во временный холст и оставляем только плотные точки. */
-function text(d: Uint8ClampedArray, s: string, cy: number, size: number, g: number) {
+function text(d: Uint8ClampedArray, s: string, cy: number, size: number, g: number, k = 1) {
+  if (!s) return
+  const w = W * k
   const c = document.createElement('canvas')
-  c.width = W
-  c.height = size + 8
+  c.width = w
+  c.height = size + 8 * k
   const ctx = c.getContext('2d')
   if (!ctx) return
   let fs = size
@@ -275,17 +277,31 @@ function text(d: Uint8ClampedArray, s: string, cy: number, size: number, g: numb
     ;(ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = `${Math.round(fs / 4)}px`
   }
   setFont()
-  while (ctx.measureText(s).width > W - 28 && fs > 6) {
+  while (ctx.measureText(s).width > w - 28 * k && fs > 6 * k) {
     fs--
     setFont()
   }
   ctx.fillStyle = '#fff'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(s, W / 2, c.height / 2)
+  ctx.fillText(s, w / 2, c.height / 2)
   const m = ctx.getImageData(0, 0, c.width, c.height).data
   const top = Math.round(cy - c.height / 2)
-  for (let y = 0; y < c.height; y++) for (let x = 0; x < W; x++) if (m[(y * W + x) * 4 + 3] > 120) px(d, x, top + y, g)
+  for (let y = 0; y < c.height; y++)
+    for (let x = 0; x < w; x++) {
+      const yy = top + y
+      if (m[(y * w + x) * 4 + 3] <= 120 || yy < 0 || yy >= H * k) continue
+      const i = (yy * w + x) * 4
+      d[i] = g
+      d[i + 1] = g
+      d[i + 2] = Math.min(255, g + 3)
+    }
+}
+
+/** Номер сверху и имя снизу. k — масштаб холста относительно 160×240: подписи рисуются в полном разрешении. */
+export function labels(d: Uint8ClampedArray, top: string, bottom: string, k = 1) {
+  text(d, top, ((AY0 - 1) / 2 + 1) * k, 9 * k, 240, k)
+  text(d, bottom, ((AY1 + H) / 2 - 1) * k, 11 * k, 240, k)
 }
 
 /** Рамка шаблона: чёрные поля, двойная тонкая линия, метки в углах, номер сверху и имя снизу. */
@@ -312,6 +328,5 @@ export function frame(d: Uint8ClampedArray, top: string, bottom: string) {
   }
   // потёки с нижнего края рисунка на поле
   for (const x of [AX0 + 17, AX0 + 66, AX1 - 30]) for (let j = 1; j < 3 + (x % 3); j++) px(d, x, AY1 + j, 108)
-  text(d, top, (AY0 - 1) / 2 + 1, 9, 240)
-  text(d, bottom, (AY1 + H) / 2 - 1, 11, 240)
+  labels(d, top, bottom)
 }

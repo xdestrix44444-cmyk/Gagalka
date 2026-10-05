@@ -2,7 +2,7 @@
 // генерация) приводится к стилю колоды — 5 оттенков серого, штриховка строками, потёки, рамка.
 // Карта получается вдвое крупнее кодовых сцен: 320×480.
 
-import { AX0, AX1, AY0, AY1, H, Ink, W, clamp, frame, hash, toPixels } from './ink'
+import { AX0, AX1, AY0, AY1, H, Ink, W, clamp, frame, hash, labels, toPixels } from './ink'
 
 export const K = 2
 const LEVELS = [6, 50, 108, 174, 240]
@@ -19,6 +19,7 @@ export function presetFromImage(
   top: string,
   bottom: string,
   color = true,
+  framed = true,
 ) {
   const w = W * K
   const h = H * K
@@ -26,24 +27,26 @@ export function presetFromImage(
   canvas.height = h
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  // рамка из обычного шаблона, увеличенная вдвое
-  const small = toPixels(new Ink(0))
-  frame(small, top, bottom)
   const out = ctx.createImageData(w, h)
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const s = ((y >> 1) * W + (x >> 1)) * 4
-      const t = (y * w + x) * 4
-      out.data[t] = small[s]
-      out.data[t + 1] = small[s + 1]
-      out.data[t + 2] = small[s + 2]
-      out.data[t + 3] = 255
-    }
-  // рисунок: заполняем окно с обрезкой по центру
-  const ax0 = AX0 * K
-  const ay0 = AY0 * K
-  const aw = (AX1 - AX0) * K
-  const ah = (AY1 - AY0) * K
+  if (framed) {
+    // рамка из обычного шаблона, увеличенная вдвое; подписи потом рисуются поверх в полном разрешении
+    const small = toPixels(new Ink(0))
+    frame(small, '', '')
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const s = ((y >> 1) * W + (x >> 1)) * 4
+        const t = (y * w + x) * 4
+        out.data[t] = small[s]
+        out.data[t + 1] = small[s + 1]
+        out.data[t + 2] = small[s + 2]
+        out.data[t + 3] = 255
+      }
+  } else for (let t = 3; t < out.data.length; t += 4) out.data[t] = 255
+  // рисунок: заполняем окно (или всю карту без рамки) с обрезкой по центру
+  const ax0 = framed ? AX0 * K : 0
+  const ay0 = framed ? AY0 * K : 0
+  const aw = framed ? (AX1 - AX0) * K : w
+  const ah = framed ? (AY1 - AY0) * K : h
   const tmp = document.createElement('canvas')
   tmp.width = aw
   tmp.height = ah
@@ -88,6 +91,7 @@ export function presetFromImage(
           out.data[t + c] = CH[Math.min(m, th < p - lo ? lo + 1 : lo)]
         }
       }
+    if (framed) labels(out.data, top, bottom, K)
     ctx.putImageData(out, 0, 0)
     return
   }
@@ -102,5 +106,6 @@ export function presetFromImage(
       out.data[t + 1] = g
       out.data[t + 2] = Math.min(255, g + 3)
     }
+  if (framed) labels(out.data, top, bottom, K)
   ctx.putImageData(out, 0, 0)
 }

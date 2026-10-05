@@ -35,14 +35,25 @@ describe('dayKey', () => {
 })
 
 describe('колода', () => {
-  it('в игре сейчас только карты с утверждаемым дизайном', () => {
-    expect(ACTIVE_DECK.map((c) => c.id)).toEqual([1, 13, 16, 18])
+  it('в игре сейчас только карты с рисунком из «карточек»', async () => {
+    const { hasArt } = await import('./sprites')
+    expect(ACTIVE_DECK.map((c) => c.name)).toEqual(['Шут', 'Иерофант', 'Башня', 'Звезда', 'Двойка Жезлов', 'Семёрка Кубков'])
+    for (const c of ACTIVE_DECK) expect(hasArt(c.id)).toBe(true)
   })
 
-  it('содержит 22 старших аркана с уникальными номерами', () => {
-    expect(DECK).toHaveLength(22)
-    expect(new Set(DECK.map((c) => c.id)).size).toBe(22)
+  it('полная колода: 78 карт, id совпадает с местом в колоде', () => {
+    expect(DECK).toHaveLength(78)
     DECK.forEach((c, i) => expect(c.id).toBe(i))
+    expect(DECK.filter((c) => !c.suit)).toHaveLength(22)
+    for (const suit of ['wands', 'cups', 'swords', 'pentacles'] as const) expect(DECK.filter((c) => c.suit === suit)).toHaveLength(14)
+  })
+
+  it('у младших арканов есть номинал и масть в имени', () => {
+    expect(DECK[22]).toMatchObject({ numeral: 'I', name: 'Туз Жезлов', file: 'ЖЕЗЛЫ_01.EXE' })
+    expect(DECK[23]).toMatchObject({ numeral: 'II', name: 'Двойка Жезлов' })
+    expect(DECK[42]).toMatchObject({ numeral: 'VII', name: 'Семёрка Кубков' })
+    expect(DECK[77]).toMatchObject({ numeral: 'XIV', name: 'Король Пентаклей', file: 'ПЕНТАКЛИ_КОРОЛЬ.EXE' })
+    expect(new Set(DECK.map((c) => c.file)).size).toBe(78)
   })
 })
 
@@ -65,9 +76,9 @@ describe('целостность карт', () => {
 })
 
 describe('повреждённые версии', () => {
-  it('у Башни и Луны есть повреждённая версия с логом и текстом', async () => {
+  it('у Башни и Луны есть повреждённая версия с логом и текстом; в игре пока только Башня', async () => {
     const { CORRUPT_TOTAL, variantOf } = await import('./deck')
-    expect(CORRUPT_TOTAL).toBe(2)
+    expect(CORRUPT_TOTAL).toBe(1)
     for (const id of [16, 18]) {
       const v = variantOf(DECK[id], true)
       expect(v.log).toHaveLength(2)
