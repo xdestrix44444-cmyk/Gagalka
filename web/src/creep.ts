@@ -1,11 +1,6 @@
 // «Повреждённые» версии карт: редкая жуткая версия вместо обычной.
 // Смысл толкования остаётся добрым, меняются картинка и системный лог.
 
-export type CreepLevel = 'off' | 'normal' | 'high'
-
-export const CREEP_LEVELS: readonly CreepLevel[] = ['off', 'normal', 'high']
-export const CREEP_LABEL: Record<CreepLevel, string> = { off: 'выкл', normal: 'обычная', high: 'повышенная' }
-
 /** Базовый шанс повреждённой версии у карты, у которой она есть: примерно 1 из 12. */
 export const BASE_CHANCE = 1 / 12
 export const MAX_CHANCE = 0.5
@@ -38,18 +33,15 @@ export interface CreepContext {
   /** Карта, выпавшая прошлой в дневнике, если есть. */
   previousCardId: number | null
   cardId: number
-  level: CreepLevel
 }
 
 /** Вероятность повреждённой версии: ночью, в новолуние, при повторной карте и в пятницу 13-го она растёт. */
 export function corruptChance(ctx: CreepContext): number {
-  if (ctx.level === 'off') return 0
   let p = BASE_CHANCE
   if (isNight(ctx.date)) p *= 2
   if (isNewMoon(ctx.date)) p *= 2
   if (ctx.previousCardId === ctx.cardId) p *= 2
   if (isFriday13(ctx.date)) p *= 3
-  if (ctx.level === 'high') p *= 2
   return Math.min(p, MAX_CHANCE)
 }
 

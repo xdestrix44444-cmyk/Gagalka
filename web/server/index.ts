@@ -1,0 +1,126 @@
+// Сервер ИИ-толкований «Нити». Ключ API живёт только здесь, в переменных окружения (web/.env).
+// POST /api/reading — толкование потоком обычного текста; GET /api/health — включён ли ИИ.
+// Запуск: npm run server (в разработке Vite проксирует /api сюда).
+
+import Anthropic from '@anthropic-ai/sdk'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { parseReadingRequest } from '../src/reading-request'
+import { SYSTEM_PROMPT, buildUserMessage } from './prompt'
+
+try {
+  process.loadEnvFile('.env')
+} catch {
+  // .env нет: берём переменные из окружения
+}
+
+const PORT = Number(process.env.PORT ?? 8787)
+const MODEL = 'claude-sonnet-5-5'
+/** Запросов с одного адреса в час. Грубая защита от перерасхода до подключения подписки. */
+const HOURLY_LIMIT = Number(process.env.READINGS_PER_HOUR ?? 30)
+const BODY_LIMIT = 4096
+
+const hasKey = () => !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN)
+const client = hasKey() ? new Anthropic() : null
+
+const hits = new Map<string, number[]>()
+
+function allow(ip: string): boolean {
+  const now = Date.now()
+  const recent = (hits.get(ip) ?? []).filter((t) => now - t < 3_600_000)
+  if (recent.length >= HOURLY_LIMIT) return false
+  recent.push(now)
+  hits.set(ip, recent)
+  return true
+}
+
+/** За прокси (хостинг) адрес клиента в X-Forwarded-For; доверяем ему только с TRUST_PROXY=1. */
+function clientIp(req: IncomingMessage): string {
+  const fwd = req.headers['x-forwarded-for']
+  if (process.env.TRUST_PROXY === '1' && typeof fwd === 'string') return fwd.split(',')[0].trim()
+  return req.socket.remoteAddress ?? 'unknown'
+}
+
+function json(res: ServerResponse, status: number, body: unknown) {
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
+  res.end(JSON.stringify(body))
+}
+
+async function readBody(req: IncomingMessage): Promise<string | null> {
+  let size = 0
+  const chunks: Buffer[] = []
+  for await (const chunk of req) {
+    size += chunk.length
+    if (size > BODY_LIMIT) return null
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+async function reading(req: IncomingMessage, res: ServerResponse) {
+  if (!client) return json(res, 503, { error: 'no-key' })
+  const body = await readBody(req)
+  if (body === null) return json(res, 413, { error: 'слишком большой запрос' })
+  let raw: unknown
+  try {
+    raw = JSON.parse(body)
+  } catch {
+    return json(res, 400, { error: 'неверный JSON' })
+  }
+  const parsed = parseReadingRequest(raw)
+  if (typeof parsed === 'string') return json(res, 400, { error: parsed })
+  if (!allow(clientIp(req))) return json(res, 429, { error: 'слишком много толкований, попробуйте через час' })
+
+  const stream = client.beta.messages.stream({
+    model: MODEL,
+    max_tokens: 16000,
+    output_config: { effort: 'low' },
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default',
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: buildUserMessage(parsed) }],
+  })
+  // человек закрыл экран — останавливаем генерацию, чтобы не платить за неё
+  res.on('close', () => {
+    if (!res.writableFinished) stream.abort()
+  })
+
+  let started = false
+  try {
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        if (!started) {
+          res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' })
+          started = true
+        }
+        res.write(event.delta.text)
+      }
+    }
+    const final = await stream.finalMessage()
+    if (final.stop_reason === 'refusal') console.warn('толкование отклонено', final.stop_details)
+    if (!started) return json(res, 502, { error: final.stop_reason === 'refusal' ? 'refusal' : 'пустой ответ' })
+    res.end()
+  } catch (err) {
+    if (err instanceof Anthropic.RateLimitError) console.warn('лимит API', err.message)
+    else if (err instanceof Anthropic.APIConnectionError) console.warn('нет связи с API', err.message)
+    else if (err instanceof Anthropic.APIError) console.error('ошибка API', err.status, err.message)
+    else if (!res.destroyed) console.error(err)
+    // уже начатый поток просто обрываем: приложение покажет то, что успело прийти, или запасной текст
+    if (!started && !res.headersSent) json(res, 502, { error: 'ИИ недоступен' })
+    else res.end()
+  }
+}
+
+createServer((req, res) => {
+  const url = req.url?.split('?')[0]
+  if (req.method === 'GET' && url === '/api/health') return json(res, 200, { ai: !!client, model: MODEL })
+  if (req.method === 'POST' && url === '/api/reading') {
+    reading(req, res).catch((err) => {
+      console.error(err)
+      if (!res.headersSent) json(res, 500, { error: 'ошибка сервера' })
+    })
+    return
+  }
+  json(res, 404, { error: 'не найдено' })
+}).listen(PORT, () => {
+  console.log(`Нить: сервер толкований на http://localhost:${PORT} · ИИ ${client ? `включён (${MODEL})` : 'выключен: нет ANTHROPIC_API_KEY в web/.env'}`)
+})

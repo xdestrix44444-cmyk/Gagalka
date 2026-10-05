@@ -21,8 +21,8 @@ export function initTelegram(): { firstName: string | null } {
   if (!tg) return { firstName: null }
   tg.ready()
   tg.expand()
-  tg.setHeaderColor?.('#0a0a0b')
-  tg.setBackgroundColor?.('#0a0a0b')
+  tg.setHeaderColor?.('#060608')
+  tg.setBackgroundColor?.('#060608')
   return { firstName: tg.initDataUnsafe?.user?.first_name ?? null }
 }
 

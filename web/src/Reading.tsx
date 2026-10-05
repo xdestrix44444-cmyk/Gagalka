@@ -1,10 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { INTEGRITY_LABEL, integrityState, variantOf, type Arcana } from './deck'
 
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
-/** Толкование в виде терминального лога: строки появляются по одной. delay — пауза до первой строки, мс (пока карта переворачивается). */
-export function Reading({ card: base, position, corrupt = false, delay = 0 }: { card: Arcana; position?: string; corrupt?: boolean; delay?: number }) {
+interface Props {
+  card: Arcana
+  position?: string
+  corrupt?: boolean
+  /** Пауза до первой строки лога, мс (пока карта переворачивается). */
+  delay?: number
+  /** Тело толкования после лога. По умолчанию временный текст колоды; null — только лог и имя. */
+  body?: ReactNode
+}
+
+/** Толкование в виде терминального лога: строки появляются по одной, затем имя карты и текст. */
+export function Reading({ card: base, position, corrupt = false, delay = 0, body }: Props) {
   const card = variantOf(base, corrupt)
   const state = integrityState(card.integrity)
   const lines = [
@@ -38,7 +48,7 @@ export function Reading({ card: base, position, corrupt = false, delay = 0 }: { 
           <h2>
             {card.numeral} · {card.name}
           </h2>
-          <p className="text">{card.text}</p>
+          {body === undefined ? <p className="text">{card.text}</p> : body}
         </div>
       )}
     </article>

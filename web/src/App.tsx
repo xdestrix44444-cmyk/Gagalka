@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { CREEP_LABEL, CREEP_LEVELS, rollCorrupt, type CreepLevel } from './creep'
-import { CORRUPT_TOTAL, DECK } from './deck'
+import { rollCorrupt } from './creep'
+import { AiText } from './AiText'
+import { CORRUPT_TOTAL, DECK, variantOf } from './deck'
 import { THREE_CARD_POSITIONS, cryptoRng, dayKey, drawCards } from './draw'
+import { QUESTION_MAX } from './reading-request'
 import { FLIP_MS, PixelCard, ShuffleDeck } from './PixelCard'
+import { NatalScreen } from './natal/NatalScreen'
 import { Reading } from './Reading'
-import { foundCorrupt, loadCreepLevel, loadDayCard, loadHistory, saveCreepLevel, saveDayCard, saveHistoryEntry } from './storage'
+import { foundCorrupt, loadDayCard, loadHistory, saveDayCard, saveHistoryEntry } from './storage'
+import { play, resumeSound } from './sound'
 import { haptic, initTelegram } from './telegram'
+import { Boot, shouldBoot } from './ui/Boot'
+import { Haunt } from './ui/Haunt'
+import { StatusBar } from './ui/StatusBar'
 
-type Screen = 'home' | 'spread' | 'diary'
+type Screen = 'home' | 'spread' | 'diary' | 'natal'
 
 /** Сколько тасуется колода перед картой дня, мс; совпадает с .shuffle в styles.css. */
 const SHUFFLE_MS = 1100
@@ -19,7 +26,7 @@ const tg = initTelegram()
 /** Бросает кубик «повреждённости» для карты; предыдущей считается последняя карта дневника. */
 function rollFor(cardId: number, previousCardId: number | null): boolean {
   if (!DECK[cardId].corrupt) return false
-  return rollCorrupt({ date: new Date(), previousCardId, cardId, level: loadCreepLevel() }, cryptoRng)
+  return rollCorrupt({ date: new Date(), previousCardId, cardId }, cryptoRng)
 }
 
 function lastCardId(): number | null {
@@ -29,28 +36,46 @@ function lastCardId(): number | null {
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('home')
+  const [booting, setBooting] = useState(shouldBoot)
+  const go = (s: Screen) => {
+    play('tap')
+    setScreen(s)
+    window.scrollTo({ top: 0 })
+  }
   return (
-    <main className="app">
-      <header className="top">
-        <button type="button" className="brand" onClick={() => setScreen('home')}>
-          НИТЬ
-        </button>
-        <span className="tagline">нейро-таро</span>
-      </header>
-      {screen === 'home' && <Home onSpread={() => setScreen('spread')} onDiary={() => setScreen('diary')} />}
-      {screen === 'spread' && <Spread onBack={() => setScreen('home')} />}
-      {screen === 'diary' && <Diary onBack={() => setScreen('home')} />}
-      <p className="disclaimer">
-        Толкования носят рефлексивный и развлекательный характер и не заменяют советы врача, юриста или психолога.
-      </p>
-    </main>
+    <>
+      <Haunt />
+      {/* звук можно запустить только после жеста: первое касание возобновляет гул, если он включён */}
+      <main className="app" onPointerDown={resumeSound}>
+        <StatusBar onHome={() => setScreen('home')} />
+        {screen === 'home' && <Home onSpread={() => go('spread')} onDiary={() => go('diary')} onNatal={() => go('natal')} />}
+        {screen === 'spread' && <Spread onBack={() => go('home')} />}
+        {screen === 'diary' && <Diary onBack={() => go('home')} />}
+        {screen === 'natal' && <NatalScreen onBack={() => go('home')} />}
+        <p className="disclaimer">
+          Толкования носят рефлексивный и развлекательный характер и не заменяют советы врача, юриста или психолога.
+        </p>
+      </main>
+      <div className="crt" aria-hidden="true" />
+      {booting && <Boot onDone={() => setBooting(false)} />}
+    </>
   )
 }
 
-function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void }) {
+/** Заголовок экрана с пиксельными ромбами по краям. */
+function Title({ children }: { children: string }) {
+  return (
+    <h1 className="title">
+      <span className="gem" aria-hidden="true" />
+      {children}
+      <span className="gem" aria-hidden="true" />
+    </h1>
+  )
+}
+
+function Home({ onSpread, onDiary, onNatal }: { onSpread: () => void; onDiary: () => void; onNatal: () => void }) {
   const today = useMemo(() => dayKey(), [])
   const [day, setDay] = useState(() => loadDayCard(today))
-  const [level, setLevel] = useState<CreepLevel>(loadCreepLevel)
   const cardId = day ? day.cardId : null
   // тасование перед картой дня; justRevealed — карту открыли сейчас, а не раньше сегодня
   const [shuffling, setShuffling] = useState(false)
@@ -60,6 +85,7 @@ function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void
     if (cardId !== null || shuffling) return
     haptic()
     if (prefersReducedMotion()) return pick()
+    play('shuffle')
     setShuffling(true)
     const pulses = [SHUFFLE_MS / 3, (SHUFFLE_MS * 2) / 3].map((t) => setTimeout(() => haptic(), t))
     setTimeout(() => {
@@ -73,6 +99,8 @@ function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void
     const [card] = drawCards(1)
     const corrupt = rollFor(card.id, lastCardId())
     if (corrupt) haptic('error')
+    play('flip')
+    if (corrupt) play('corrupt')
     const entry = { cardId: card.id, corrupt }
     saveDayCard(today, entry)
     saveHistoryEntry({ kind: 'day', cards: [card.id], corrupt: corrupt ? [card.id] : [] })
@@ -83,41 +111,48 @@ function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void
   const card = cardId === null ? null : DECK[cardId]
   return (
     <section className="screen">
-      <h1>{tg.firstName ? `Привет, ${tg.firstName}` : 'Привет'}</h1>
-      <p className="lede">Карта дня. Подумайте о том, что сегодня для вас важно, и откройте карту.</p>
-      <div className="stage single">
+      <p className="greet">
+        <span className="prompt">&gt;</span> {tg.firstName ? `с возвращением, ${tg.firstName}` : 'пользователь опознан'}
+      </p>
+      <Title>Карта дня</Title>
+      <p className="lede">Подумайте о том, что сегодня для вас важно, и коснитесь карты.</p>
+      <div className="stage single altar">
         {shuffling ? (
           <ShuffleDeck />
         ) : (
           <PixelCard id={cardId} corrupt={day?.corrupt} animate={justRevealed} label={card ? `Карта дня: ${card.name}${day?.corrupt ? ' (повреждённая версия)' : ''}` : 'Карта дня, рубашка. Нажмите, чтобы открыть'} onClick={card ? undefined : reveal} />
         )}
-        {card && <Reading card={card} corrupt={day?.corrupt} delay={justRevealed ? FLIP_MS : 0} />}
-        {!card && <p className="hint">{shuffling ? 'Тасую колоду…' : 'Нажмите на карту'}</p>}
+        {card && day && (
+          <Reading
+            card={card}
+            corrupt={day.corrupt}
+            delay={justRevealed ? FLIP_MS : 0}
+            body={
+              <AiText
+                request={{ kind: 'day', cards: [{ id: card.id, corrupt: day.corrupt }] }}
+                saved={day.ai}
+                fallback={<p className="text">{variantOf(card, day.corrupt).text}</p>}
+                onDone={(ai) => {
+                  const next = { ...day, ai }
+                  saveDayCard(today, next)
+                  setDay(next)
+                }}
+              />
+            }
+          />
+        )}
+        {!card && <p className="hint">{shuffling ? 'тасую колоду…' : 'коснитесь нити'}</p>}
       </div>
-      <div className="creep">
-        <span id="creep-label">Жуть</span>
-        <div className="seg" role="group" aria-labelledby="creep-label">
-          {CREEP_LEVELS.map((l) => (
-            <button
-              key={l}
-              type="button"
-              aria-pressed={level === l}
-              onClick={() => {
-                setLevel(l)
-                saveCreepLevel(l)
-              }}
-            >
-              {CREEP_LABEL[l]}
-            </button>
-          ))}
-        </div>
-      </div>
+      <div className="divider" aria-hidden="true" />
       <div className="actions">
         <button type="button" className="btn primary" onClick={onSpread}>
-          Расклад на три карты
+          Три карты
         </button>
         <button type="button" className="btn" onClick={onDiary}>
           Дневник
+        </button>
+        <button type="button" className="btn wide" onClick={onNatal}>
+          Натальная карта
         </button>
       </div>
     </section>
@@ -142,13 +177,19 @@ function Spread({ onBack }: { onBack: () => void }) {
   const flags = dealt.flags
   const [open, setOpen] = useState<boolean[]>([false, false, false])
   const allOpen = open.every(Boolean)
+  const started = open.some(Boolean)
+  const [question, setQuestion] = useState('')
 
   const flip = (i: number) => {
     if (open[i]) return
     haptic()
+    play('flip')
     // функциональное обновление: быстрые нажатия подряд не теряют открытые карты
     setOpen((prev) => prev.map((v, k) => (k === i ? true : v)))
-    if (flags[i]) haptic('error')
+    if (flags[i]) {
+      haptic('error')
+      play('corrupt')
+    }
   }
 
   // расклад попадает в дневник, когда открыта последняя карта
@@ -158,15 +199,25 @@ function Spread({ onBack }: { onBack: () => void }) {
   }, [allOpen])
 
   const again = () => {
+    play('tap')
     setDealt(deal())
     setRound((r) => r + 1)
     setOpen([false, false, false])
+    setQuestion('')
   }
 
   return (
     <section className="screen">
-      <h1>Три карты</h1>
-      <p className="lede">Сформулируйте вопрос про себя и открывайте карты по порядку.</p>
+      <Title>Три карты</Title>
+      <p className="lede">Задайте вопрос или просто подумайте о нём, затем открывайте карты по порядку.</p>
+      {started ? (
+        question.trim() && <p className="asked">«{question.trim()}»</p>
+      ) : (
+        <label className="question">
+          <span><span className="prompt">&gt;</span> вопрос к нити (необязательно)</span>
+          <textarea value={question} maxLength={QUESTION_MAX} rows={2} placeholder="Например: что мне важно понять про новую работу?" onChange={(e) => setQuestion(e.target.value)} />
+        </label>
+      )}
       <div className="stage three">
         {cards.map((c, i) => (
           <figure key={`${round}-${i}`} className="slot deal" style={{ '--i': i } as CSSProperties}>
@@ -187,10 +238,25 @@ function Spread({ onBack }: { onBack: () => void }) {
         {cards.map(
           (c, i) =>
             open[i] && (
-              <Reading key={`${round}-${i}`} card={c} corrupt={flags[i]} position={THREE_CARD_POSITIONS[i]} delay={FLIP_MS} />
+              <Reading key={`${round}-${i}`} card={c} corrupt={flags[i]} position={THREE_CARD_POSITIONS[i]} delay={FLIP_MS} body={null} />
             ),
         )}
+        {allOpen && (
+          <article key={round} className="reading summary">
+            <h2>&gt; толкование расклада</h2>
+            <AiText
+              request={{ kind: 'three', cards: cards.map((c, i) => ({ id: c.id, corrupt: flags[i] })), question: question.trim() || undefined }}
+              delay={FLIP_MS + 1400}
+              fallback={cards.map((c, i) => (
+                <p key={i} className="text">
+                  <b>{THREE_CARD_POSITIONS[i]}.</b> {variantOf(c, flags[i]).text}
+                </p>
+              ))}
+            />
+          </article>
+        )}
       </div>
+      <div className="divider" aria-hidden="true" />
       <div className="actions">
         {allOpen && (
           <button type="button" className="btn primary" onClick={again}>
@@ -211,16 +277,19 @@ function Diary({ onBack }: { onBack: () => void }) {
   const fmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
   return (
     <section className="screen">
-      <h1>Дневник</h1>
-      <p className="found">Найдено повреждённых: {found.size} из {CORRUPT_TOTAL}</p>
+      <Title>Дневник</Title>
+      <p className="found">
+        <span className="prompt">&gt;</span> найдено повреждённых файлов: {found.size} из {CORRUPT_TOTAL}
+      </p>
       {history.length === 0 ? (
         <p className="lede">Здесь появятся ваши расклады. Откройте карту дня или сделайте первый расклад.</p>
       ) : (
         <ul className="diary">
           {history.map((h) => (
             <li key={h.id}>
-              <span className="when">{fmt.format(h.at)}</span>
-              <span className="kind">{h.kind === 'day' ? 'Карта дня' : 'Три карты'}</span>
+              <span className="when">
+                [{fmt.format(h.at)}] <span className="kind">{h.kind === 'day' ? 'карта дня' : 'три карты'}</span>
+              </span>
               <span className="names">
                 {h.cards.map((id, i) => (
                   <span key={i} className={h.corrupt?.includes(id) ? 'bad' : undefined}>
@@ -234,6 +303,7 @@ function Diary({ onBack }: { onBack: () => void }) {
           ))}
         </ul>
       )}
+      <div className="divider" aria-hidden="true" />
       <div className="actions">
         <button type="button" className="btn" onClick={onBack}>
           Назад
