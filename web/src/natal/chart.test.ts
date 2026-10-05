@@ -95,3 +95,44 @@ describe('полярные карты', () => {
         }
   })
 })
+
+describe('узлы, Лилит, аркан, транзиты', () => {
+  it('средние узел и Лилит на J2000: узел ~125° (Лев), Лилит ~263° (Стрелец)', async () => {
+    const { meanNode, meanLilith } = await import('./chart')
+    const j2000 = new Date(Date.UTC(2000, 0, 1, 12))
+    expect(meanNode(j2000)).toBeCloseTo(125.04, 1)
+    expect(meanLilith(j2000)).toBeCloseTo(263.35, 1)
+  })
+
+  it('аркан рождения сводится к 1–22, а 22 — это Шут', async () => {
+    const { birthArcana } = await import('./chart')
+    expect(birthArcana('1995-03-21')).toBe(launchSum('1995-03-21'))
+    expect(birthArcana('1999-12-29')).toBeGreaterThanOrEqual(0)
+    expect(birthArcana('1999-12-29')).toBeLessThanOrEqual(21)
+    // 2+0+0+2+0+2+0+9 = 15 → Дьявол
+    expect(birthArcana('2002-02-09')).toBe(15)
+    // 1+9+9+9+0+9+1+3 = 41 → 4+1 = 5
+    expect(birthArcana('1999-09-13')).toBe(5)
+    function launchSum(d: string) {
+      let n = [...d.replace(/-/g, '')].reduce((s, c) => s + Number(c), 0)
+      while (n > 22) n = [...String(n)].reduce((s, c) => s + Number(c), 0)
+      return n === 22 ? 0 : n
+    }
+  })
+
+  it('возможные Асценденты за 6 часов: 2–5 знаков по порядку', async () => {
+    const { possibleAscendants } = await import('./chart')
+    const signs = possibleAscendants('1995-03-21', 'morning', 'Europe/Moscow', { lat: 55.796, lon: 49.106 })
+    expect(signs.length).toBeGreaterThanOrEqual(2)
+    expect(signs.length).toBeLessThanOrEqual(5)
+    expect(signs).toContain(2) // в 7:40 по Казани восходили Близнецы
+  })
+
+  it('транзит планеты к самой себе в момент рождения — точное соединение', async () => {
+    const { crossAspects } = await import('./chart')
+    const c = computeChart(new Date('1990-05-15T10:00:00Z'))
+    const cross = crossAspects(c.planets, c.planets, 0.5)
+    expect(cross.filter((a) => a.a === a.b && a.type === 'conjunction').length).toBe(10)
+    expect(c.points.map((p) => p.key)).toEqual(['node', 'lilith'])
+  })
+})

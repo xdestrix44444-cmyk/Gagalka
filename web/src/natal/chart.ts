@@ -8,6 +8,8 @@ export const SIGNS = ['Овен', 'Телец', 'Близнецы', 'Рак', '�
 export const SIGNS_GEN = ['Овна', 'Тельца', 'Близнецов', 'Рака', 'Льва', 'Девы', 'Весов', 'Скорпиона', 'Стрельца', 'Козерога', 'Водолея', 'Рыб'] as const
 /** Предложный падеж: «Луна в Раке». */
 export const SIGNS_IN = ['Овне', 'Тельце', 'Близнецах', 'Раке', 'Льве', 'Деве', 'Весах', 'Скорпионе', 'Стрельце', 'Козероге', 'Водолее', 'Рыбах'] as const
+/** «в Овне», но «во Льве». */
+export const inSign = (sign: number) => `${sign === 4 ? 'во' : 'в'} ${SIGNS_IN[sign]}`
 /** Знаки с текстовым начертанием (U+FE0E), чтобы телефоны не рисовали их эмодзи. */
 export const SIGN_GLYPHS = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'].map((g) => g + '︎')
 
@@ -59,9 +61,25 @@ export interface Aspect {
   orb: number
 }
 
+/** Расчётные точки: северный лунный узел и Чёрная Луна (Лилит), средние положения. */
+export type PointKey = 'node' | 'lilith'
+export const POINTS: readonly { key: PointKey; name: string; glyph: string }[] = [
+  { key: 'node', name: 'Северный узел', glyph: '☊' },
+  { key: 'lilith', name: 'Лилит', glyph: '⚸' },
+]
+
+export interface PointPos {
+  key: PointKey
+  lon: number
+  sign: number
+  deg: number
+  house?: number
+}
+
 export interface Chart {
   utc: Date
   planets: PlanetPos[]
+  points: PointPos[]
   aspects: Aspect[]
   /** Есть, только если известно время рождения. */
   angles?: { asc: number; mc: number; cusps: number[]; system: 'placidus' | 'porphyry' }
@@ -80,6 +98,21 @@ function longitude(key: PlanetKey, body: Body | undefined, date: Date): number {
   if (key === 'sun') return SunPosition(date).elon
   if (key === 'moon') return EclipticGeoMoon(date).lon
   return Ecliptic(GeoVector(body!, date, true)).elon
+}
+
+/** Юлианские века от J2000 (разницей TT и UT для точек с суточным ходом в градусы можно пренебречь). */
+const centuries = (utc: Date) => (utc.getTime() - Date.UTC(2000, 0, 1, 12)) / (36525 * 86_400_000)
+
+/** Средний северный лунный узел (Меес, гл. 47). */
+export function meanNode(utc: Date): number {
+  const t = centuries(utc)
+  return norm(125.04452 - 1934.136261 * t + 0.0020708 * t * t + (t * t * t) / 450000)
+}
+
+/** Средняя Лилит: апогей лунной орбиты, перигей по Меесу + 180°. */
+export function meanLilith(utc: Date): number {
+  const t = centuries(utc)
+  return norm(83.3532465 + 4069.0137287 * t - 0.01032 * t * t - (t * t * t) / 80053 + (t * t * t * t) / 18999000 + 180)
 }
 
 /** Асцендент, MC и куспиды домов для момента (UTC) и места. */
@@ -159,7 +192,58 @@ export function computeChart(utc: Date, place?: { lat: number; lon: number }): C
       }
     }
   aspects.sort((x, y) => x.orb - y.orb)
-  return { utc, planets, aspects, angles }
+  const points: PointPos[] = [
+    { key: 'node' as const, lon: meanNode(utc) },
+    { key: 'lilith' as const, lon: meanLilith(utc) },
+  ].map((p) => ({ ...p, sign: Math.floor(p.lon / 30), deg: p.lon % 30, house: angles ? houseOf(p.lon, angles.cusps) : undefined }))
+  return { utc, planets, points, aspects, angles }
+}
+
+/** Связь между планетой первой карты (a) и планетой второй (b): транзиты или совместимость. */
+export interface CrossAspect extends Aspect {}
+
+/** Аспекты между двумя наборами планет. orbScale сужает орбисы (для транзитов берут уже). */
+export function crossAspects(a: PlanetPos[], b: PlanetPos[], orbScale = 1): CrossAspect[] {
+  const out: CrossAspect[] = []
+  for (const x of a)
+    for (const y of b) {
+      const d = Math.min(arc(x.lon, y.lon), arc(y.lon, x.lon))
+      for (const asp of ASPECTS) {
+        const orb = Math.abs(d - asp.angle)
+        if (orb <= asp.orb * orbScale) out.push({ a: x.key, b: y.key, type: asp.type, orb })
+      }
+    }
+  return out.sort((x, y) => x.orb - y.orb)
+}
+
+export type DayPeriod = 'night' | 'morning' | 'day' | 'evening'
+export const PERIODS: readonly { key: DayPeriod; name: string; from: number }[] = [
+  { key: 'night', name: 'ночью (0–6)', from: 0 },
+  { key: 'morning', name: 'утром (6–12)', from: 6 },
+  { key: 'day', name: 'днём (12–18)', from: 12 },
+  { key: 'evening', name: 'вечером (18–24)', from: 18 },
+]
+
+/** Знаки, которые могли восходить в течение части суток: по Асценденту каждые 15 минут. */
+export function possibleAscendants(date: string, period: DayPeriod, timeZone: string, place: { lat: number; lon: number }): number[] {
+  const from = PERIODS.find((p) => p.key === period)!.from
+  const signs = new Set<number>()
+  for (let m = 0; m < 6 * 60; m += 15) {
+    const hh = String(from + Math.floor(m / 60)).padStart(2, '0')
+    const mm = String(m % 60).padStart(2, '0')
+    signs.add(Math.floor(houses(localToUtc(date, `${hh}:${mm}`, timeZone), place.lat, place.lon).asc / 30))
+  }
+  return [...signs]
+}
+
+/** Середина части суток — время для расчёта планет, когда известен только период. */
+export const periodMidpoint = (period: DayPeriod) => `${String(PERIODS.find((p) => p.key === period)!.from + 3).padStart(2, '0')}:00`
+
+/** Аркан рождения: сумма всех цифр даты, сводимая к 1–22; 22 — Шут (0). */
+export function birthArcana(date: string): number {
+  let n = [...date.replace(/-/g, '')].reduce((sum, d) => sum + Number(d), 0)
+  while (n > 22) n = [...String(n)].reduce((sum, d) => sum + Number(d), 0)
+  return n === 22 ? 0 : n
 }
 
 /** Местное время рождения в часовом поясе города → момент UTC (с историческими сдвигами поясов). */

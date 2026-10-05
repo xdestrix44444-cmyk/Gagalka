@@ -1,7 +1,8 @@
 // Портрет по натальной карте: не справочник «планета в знаке», а связный текст из главных узоров карты.
 // Временные тексты до подключения ИИ; тон — как у колоды: на «вы», бережно, без предсказаний судьбы.
 
-import { ASPECTS, PLANETS, SIGNS_IN, signElement, signModality, type Chart, type Element, type Modality, type PlanetKey } from './chart'
+import { HOUSE_SPHERE, HOW } from './meanings'
+import { ASPECTS, PLANETS, inSign, signElement, signModality, type Chart, type Element, type Modality, type PlanetKey } from './chart'
 
 export interface PortraitSection {
   title: string
@@ -124,16 +125,20 @@ export function elementBalance(chart: Chart): Record<Element, number> {
 const PERSONAL: PlanetKey[] = ['sun', 'moon', 'mercury', 'venus', 'mars']
 const SOCIAL: PlanetKey[] = [...PERSONAL, 'jupiter', 'saturn']
 
+/** Главная личная связь карты: самый точный аспект, где участвует хотя бы одна личная планета. */
+export const mainAspect = (chart: Chart) =>
+  chart.aspects.find((a) => SOCIAL.includes(a.a) && SOCIAL.includes(a.b) && (PERSONAL.includes(a.a) || PERSONAL.includes(a.b)))
+
 export function portrait(chart: Chart): PortraitSection[] {
   const by = (k: PlanetKey) => chart.planets.find((p) => p.key === k)!
   const sun = by('sun')
   const moon = by('moon')
   const sections: PortraitSection[] = []
 
-  let core = `Солнце в ${SIGNS_IN[sun.sign]}, Луна в ${SIGNS_IN[moon.sign]}. ${CORE[`${signElement(sun.sign)}-${signElement(moon.sign)}`]}`
+  let core = `Солнце ${inSign(sun.sign)}, Луна ${inSign(moon.sign)}. ${CORE[`${signElement(sun.sign)}-${signElement(moon.sign)}`]}`
   if (chart.angles) {
     const asc = Math.floor(chart.angles.asc / 30)
-    core += `\n\nАсцендент в ${SIGNS_IN[asc]}. ${ASC_TEXT[signElement(asc)]}`
+    core += `\n\nАсцендент ${inSign(asc)}. ${ASC_TEXT[signElement(asc)]}`
   }
   sections.push({ title: 'ядро', text: core, focus: { planets: ['sun', 'moon'], houses: chart.angles ? [1] : undefined } })
 
@@ -150,7 +155,7 @@ export function portrait(chart: Chart): PortraitSection[] {
     focus: { planets: chart.planets.filter((p) => signElement(p.sign) === top).map((p) => p.key) },
   })
 
-  const main = chart.aspects.find((a) => SOCIAL.includes(a.a) && SOCIAL.includes(a.b) && (PERSONAL.includes(a.a) || PERSONAL.includes(a.b)))
+  const main = mainAspect(chart)
   if (main) {
     const asp = ASPECTS.find((x) => x.type === main.type)!
     const [a, b] = [THEME[main.a], THEME[main.b]]
@@ -174,7 +179,7 @@ export function portrait(chart: Chart): PortraitSection[] {
       title: 'где собрана энергия',
       text: chart.angles
         ? `${names} собрались в ${cluster}-м доме — доме ${HOUSE_THEME[cluster - 1]}. Сюда уходит много вашей энергии; когда в этой сфере всё в порядке, остальное подтягивается само.`
-        : `${names} собрались в ${SIGNS_IN[cluster]}. Качества этого знака звучат в вас особенно громко — это узнаваемая часть вашего характера.`,
+        : `${names} собрались ${inSign(cluster)}. Качества этого знака звучат в вас особенно громко — это узнаваемая часть вашего характера.`,
       focus: chart.angles ? { planets: keys, houses: [cluster] } : { planets: keys },
     })
   }
@@ -193,6 +198,15 @@ export function portrait(chart: Chart): PortraitSection[] {
         focus: { houses: above > 5 ? [7, 8, 9, 10, 11, 12] : [1, 2, 3, 4, 5, 6] },
       })
   }
+
+  const node = chart.points.find((p) => p.key === 'node')!
+  sections.push({
+    title: 'направление роста',
+    text: `Северный лунный узел ${inSign(node.sign)}${node.house ? `, в ${node.house}-м доме` : ''}. Расти вам стоит так: ${HOW[node.sign]}${
+      node.house ? ` — и прежде всего в сфере «${HOUSE_SPHERE[node.house - 1]}»` : ''
+    }. Это не самый лёгкий путь: привычное тянет в противоположную сторону, к южному узлу. Но именно здесь вы чувствуете, что живёте своей жизнью.`,
+    focus: { houses: node.house ? [node.house] : undefined },
+  })
 
   sections.push({ title: 'совет нити', text: ADVICE[low], focus: {} })
   return sections

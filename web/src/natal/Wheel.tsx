@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { ASPECTS, PLANETS, SIGNS, arc, norm, type Chart, type PlanetKey } from './chart'
+import { ASPECTS, PLANETS, POINTS, SIGNS, arc, norm, type Chart, type CrossAspect, type PlanetKey, type PlanetPos, type PointKey } from './chart'
 import { planetEmblem, signEmblem } from './emblems'
 
 /** Тайминги построения круга, мс; лог в NatalChart идёт по тем же отметкам. */
@@ -13,6 +13,11 @@ const R_SIGN_IN = 127
 const R_PLANET = 105
 const R_HOUSE_NUM = 46
 const R_ASPECT = 83
+/** Узел и Лилит: между кольцом аспектов и планетами. */
+const R_POINT = 93
+/** Второе кольцо внутри: небо сегодня или планеты партнёра. */
+const R_OVER = 62
+const OVER_SIZE = 15
 /** Размер эмблем на круге, единицы viewBox (круг 320). */
 const SIGN_SIZE = 25
 const PLANET_SIZE = 23
@@ -22,6 +27,34 @@ const PLANET_GAP = 12.5
 export interface Selection {
   planets?: PlanetKey[]
   houses?: number[]
+  /** Выбранная точка: узел или Лилит. */
+  point?: PointKey
+  /** Выбранная планета второго кольца. */
+  overlay?: PlanetKey
+}
+
+/** Второе кольцо: планеты неба сейчас или планеты другого человека и их связи с картой. */
+export interface Overlay {
+  kind: 'sky' | 'partner'
+  planets: PlanetPos[]
+  /** a — планета карты, b — планета второго кольца. */
+  aspects: CrossAspect[]
+}
+
+/** Раздвигает значки, стоящие слишком близко по кругу. */
+function spread(list: { key: PlanetKey; lon: number }[], gap: number): Map<PlanetKey, number> {
+  const placed = [...list].sort((a, b) => a.lon - b.lon).map((p) => ({ key: p.key, at: p.lon }))
+  for (let pass = 0; pass < 8; pass++)
+    for (let i = 0; i < placed.length; i++) {
+      const a = placed[i]
+      const b = placed[(i + 1) % placed.length]
+      const d = arc(a.at, b.at)
+      if (d < gap) {
+        a.at = norm(a.at - (gap - d) / 2)
+        b.at = norm(b.at + (gap - d) / 2)
+      }
+    }
+  return new Map(placed.map((p) => [p.key, p.at]))
 }
 
 interface Props {
@@ -30,12 +63,19 @@ interface Props {
   focus: Selection
   onPlanet: (k: PlanetKey) => void
   onHouse: (n: number) => void
+  onPoint?: (k: PointKey) => void
+  onOverlay?: (k: PlanetKey) => void
   /** Анимация построения уже была показана: рисуем сразу. */
   instant: boolean
+  overlay?: Overlay
+  /** Задержка появления второго кольца, мс (после построения круга — 0). */
+  overlayDelay?: number
+  /** Долгота, к которой приближает экскурсия; null — весь круг. */
+  zoom?: number | null
 }
 
 /** Натальный круг: Асцендент слева, знаки против часовой стрелки, как в классической карте. */
-export function Wheel({ chart, focus, onPlanet, onHouse, instant }: Props) {
+export function Wheel({ chart, focus, onPlanet, onHouse, onPoint, onOverlay, instant, overlay, overlayDelay = 0, zoom = null }: Props) {
   // точка отсчёта: Асцендент; без времени — начало знака Солнца
   const start = chart.angles?.asc ?? Math.floor(chart.planets[0].lon / 30) * 30
   const pt = (lon: number, r: number) => {
@@ -60,27 +100,20 @@ export function Wheel({ chart, focus, onPlanet, onHouse, instant }: Props) {
   }
   const delay = (ms: number) => ({ animationDelay: `${ms}ms` }) as CSSProperties
 
-  // планеты, стоящие слишком близко, раздвигаем по кругу, чтобы значки не налезали
-  const placed = [...chart.planets].sort((a, b) => a.lon - b.lon).map((p) => ({ key: p.key, lon: p.lon, at: p.lon }))
-  for (let pass = 0; pass < 8; pass++)
-    for (let i = 0; i < placed.length; i++) {
-      const a = placed[i]
-      const b = placed[(i + 1) % placed.length]
-      const gap = arc(a.at, b.at)
-      if (gap < PLANET_GAP) {
-        a.at = norm(a.at - (PLANET_GAP - gap) / 2)
-        b.at = norm(b.at + (PLANET_GAP - gap) / 2)
-      }
-    }
-  const atOf = (k: PlanetKey) => placed.find((p) => p.key === k)!.at
+  const placed = spread(chart.planets, PLANET_GAP)
+  const atOf = (k: PlanetKey) => placed.get(k)!
   const lonOf = (k: PlanetKey) => chart.planets.find((p) => p.key === k)!.lon
+  const overPlaced = overlay ? spread(overlay.planets, 19) : null
+  const overLon = (k: PlanetKey) => overlay!.planets.find((p) => p.key === k)!.lon
 
-  const hasFocus = !!(focus.planets?.length || focus.houses?.length)
+  const hasFocus = !!(focus.planets?.length || focus.houses?.length || focus.point || focus.overlay)
   const lit = (k: PlanetKey) => !hasFocus || !!focus.planets?.includes(k)
   const aspects = chart.aspects.slice(0, 20)
+  const [zx, zy] = zoom === null ? [C, C] : pt(zoom, R_PLANET)
+  const zoomStyle: CSSProperties = zoom === null ? { transform: 'none' } : { transform: 'scale(1.8)', transformOrigin: `${((zx + 10) / 340) * 100}% ${((zy + 10) / 340) * 100}%` }
 
   return (
-    <svg className={instant ? 'wheel instant' : 'wheel'} viewBox="0 0 320 320" role="img" aria-label="Натальная карта">
+    <svg className={`wheel${instant ? ' instant' : ''}${overlay ? ' has-overlay' : ''}`} viewBox="-10 -10 340 340" role="img" aria-label="Натальная карта" style={zoomStyle}>
       <circle className="w-ring" cx={C} cy={C} r={R_SIGN_OUT} />
       <circle className="w-ring" cx={C} cy={C} r={R_SIGN_IN} />
       <circle className="w-ring dim" cx={C} cy={C} r={R_ASPECT + 4} />
@@ -185,6 +218,60 @@ export function Wheel({ chart, focus, onPlanet, onHouse, instant }: Props) {
           </g>
         )
       })}
+      {/* узел и Лилит: маленькие отметки между кольцом аспектов и планетами */}
+      {chart.points.map((p, i) => {
+        const meta = POINTS.find((x) => x.key === p.key)!
+        const [x, y] = pt(p.lon, R_POINT)
+        const sel = focus.point === p.key
+        return (
+          <g key={p.key} className={`w-point ${p.key}${sel ? ' sel' : ''}${hasFocus && !sel ? ' off' : ''}`} style={delay(planetsDone() + 200 + i * 150)} onClick={() => onPoint?.(p.key)}>
+            <circle className="w-point-hit" cx={x} cy={y} r={7} />
+            <text x={x} y={y} className="w-point-glyph">
+              {meta.glyph + '\uFE0E'}
+            </text>
+            <title>{meta.name}</title>
+          </g>
+        )
+      })}
+
+      {/* второе кольцо: небо сегодня или партнёр, и нити от его планет к планетам карты */}
+      {overlay && (
+        <g className={`w-overlay ${overlay.kind}`}>
+          <circle className="w-over-ring" cx={C} cy={C} r={R_OVER} />
+          {overlay.aspects.slice(0, 16).map((a, i) => {
+            const [x1, y1] = pt(overLon(a.b), R_OVER)
+            const [x2, y2] = pt(lonOf(a.a), R_ASPECT)
+            const on = focus.overlay ? focus.overlay === a.b : focus.planets?.length === 1 ? focus.planets[0] === a.a : false
+            const off = hasFocus && !on
+            return (
+              <path
+                key={`${a.a}-${a.b}-${a.type}`}
+                className={`w-thread ${a.type}${on ? ' on' : ''}${off ? ' off' : ''}`}
+                d={`M${x1} ${y1}L${x2} ${y2}`}
+                pathLength={1}
+                style={delay(overlayDelay + 700 + i * 120)}
+              />
+            )
+          })}
+          {overlay.planets.map((p, i) => {
+            const [x, y] = pt(overPlaced!.get(p.key)!, R_OVER)
+            const [dx, dy] = pt(p.lon, R_OVER + 9)
+            const sel = focus.overlay === p.key
+            return (
+              <g
+                key={p.key}
+                className={`w-over-planet${sel ? ' sel' : ''}${hasFocus && !sel && !(focus.planets?.length === 1 && overlay.aspects.some((a) => a.b === p.key && a.a === focus.planets![0])) ? ' off' : ''}`}
+                style={{ ...delay(overlayDelay + i * 60), '--dx': `${C - x}px`, '--dy': `${C - y}px` } as CSSProperties}
+                onClick={() => onOverlay?.(p.key)}
+              >
+                <circle className="w-over-dot" cx={dx} cy={dy} r={1.2} />
+                <circle className="w-planet-hit" cx={x} cy={y} r={OVER_SIZE / 2 + 1} />
+                <image href={planetEmblem(p.key)} x={x - OVER_SIZE / 2} y={y - OVER_SIZE / 2} width={OVER_SIZE} height={OVER_SIZE} className="w-emblem" />
+              </g>
+            )
+          })}
+        </g>
+      )}
       <circle className="w-core" cx={C} cy={C} r={3} />
     </svg>
   )

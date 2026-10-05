@@ -1,5 +1,6 @@
 // Люди, для которых строятся натальные карты: своя карта и карты близких. Хранятся только в этом браузере.
 
+import { computeChart, localToUtc, periodMidpoint, type Chart, type DayPeriod } from './chart'
 import { CITIES, type City } from './cities'
 
 export interface Person {
@@ -9,6 +10,8 @@ export interface Person {
   date: string
   /** Время рождения ЧЧ:ММ; null — неизвестно (тогда без Асцендента и домов). */
   time: string | null
+  /** Если точного времени нет: примерная часть суток. */
+  period?: DayPeriod
   city: string
   region: string
   self: boolean
@@ -49,4 +52,12 @@ export function deletePerson(id: string) {
 
 export function cityOf(p: Person): City | undefined {
   return CITIES.find((c) => c.name === p.city && c.region === p.region)
+}
+
+/** Карта человека: с домами — только при точном времени; без него — на середину части суток или полдень. */
+export function chartOf(p: Person): Chart {
+  const city = cityOf(p)
+  const time = p.time ?? (p.period ? periodMidpoint(p.period) : '12:00')
+  const utc = localToUtc(p.date, time, city?.tz ?? 'Europe/Moscow')
+  return computeChart(utc, p.time && city ? city : undefined)
 }
