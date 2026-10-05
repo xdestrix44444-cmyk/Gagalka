@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { play } from '../sound'
-import { ASPECTS, PLANETS, SIGNS_GEN, computeChart, localToUtc, type PlanetKey } from './chart'
+import { ASPECTS, PLANETS, SIGNS, SIGNS_GEN, computeChart, localToUtc, type PlanetKey } from './chart'
 import { findCities, type City } from './cities'
+import { planetEmblem, signEmblem } from './emblems'
 import { cityOf, deletePerson, loadPeople, savePerson, type Person } from './people'
 import { portrait } from './portrait'
 import { STAGE, Wheel, buildMs, planetsDone, type Selection } from './Wheel'
@@ -245,6 +246,7 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
         .filter((a) => a.a === p.key || a.b === p.key)
         .map((a) => `${ASPECTS.find((x) => x.type === a.type)!.name} с ${PLANET_WITH[a.a === p.key ? a.b : a.a]}`)
       return {
+        img: planetEmblem(p.key),
         head: `${planetName(p.key)} · ${fmtDeg(p.deg)} ${SIGNS_GEN[p.sign]}${p.house ? ` · ${p.house} дом (${HOUSE_SHORT[p.house - 1]})` : ''}${p.retro ? ' · ретроградный' : ''}`,
         body: links.length ? `связи: ${links.join(', ')}` : 'без тесных связей с другими планетами',
       }
@@ -252,7 +254,7 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
     if (sel.from === 'house' && sel.houses) {
       const n = sel.houses[0]
       const inside = chart.planets.filter((p) => p.house === n).map((p) => planetName(p.key))
-      return { head: `${n} дом · ${HOUSE_SHORT[n - 1]}`, body: inside.length ? `здесь: ${inside.join(', ')}` : 'планет здесь нет: эта сфера живёт спокойно и не требует постоянного внимания' }
+      return { img: undefined, head: `${n} дом · ${HOUSE_SHORT[n - 1]}`, body: inside.length ? `здесь: ${inside.join(', ')}` : 'планет здесь нет: эта сфера живёт спокойно и не требует постоянного внимания' }
     }
     return null
   })()
@@ -274,8 +276,11 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
       <div className="wheel-caption" aria-live="polite">
         {caption ? (
           <>
-            <p className="cap-head">&gt; {caption.head}</p>
-            <p className="cap-body">{caption.body}</p>
+            {caption.img && <img className="cap-img" src={caption.img} alt="" />}
+            <div>
+              <p className="cap-head">&gt; {caption.head}</p>
+              <p className="cap-body">{caption.body}</p>
+            </div>
           </>
         ) : (
           <p className="cap-body">{built ? 'коснитесь планеты или дома, чтобы увидеть связи' : ' '}</p>
@@ -309,6 +314,26 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
               }}
             >
               <h2>&gt; {s.title}</h2>
+              {i === 0 && (
+                <div className="trio" aria-hidden="true">
+                  {(
+                    [
+                      ['Солнце', chart.planets[0].sign],
+                      ['Луна', chart.planets[1].sign],
+                      ...(chart.angles ? [['Асцендент', Math.floor(chart.angles.asc / 30)] as const] : []),
+                    ] as const
+                  ).map(([label, sign]) => (
+                    <figure key={label}>
+                      <img src={signEmblem(sign)} alt="" />
+                      <figcaption>
+                        {label}
+                        <br />
+                        <b>{SIGNS[sign]}</b>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
               {s.text.split('\n\n').map((t, k) => (
                 <p key={k} className="text">
                   {t}

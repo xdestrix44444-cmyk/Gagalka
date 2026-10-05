@@ -206,6 +206,55 @@ button.pcard-wrap .pcard-flip:not(.flipped) { animation: breathe 2.4s steps(6, e
 .ai-wait { font-family: var(--mono); font-size: .76rem; color: var(--muted); }
 .ai-text { display: grid; gap: 10px; }
 
+/* меню входа: логотип, нить и две двери */
+.menu { justify-content: center; gap: 14px; }
+.logo { display: grid; justify-items: center; gap: 10px; margin-top: 8px; }
+.logo-word { position: relative; font-family: var(--pix); font-size: clamp(2.2rem, 13vw, 3.2rem); letter-spacing: .12em; color: var(--fg);
+  text-shadow: 3px 3px 0 #000, 0 0 22px rgba(181, 84, 60, .45); animation: logo-glitch 5s steps(1, end) infinite; }
+/* сбой: копии слова сдвигаются в ржавый и бирюзовый */
+.logo-word::before, .logo-word::after { content: attr(data-text); position: absolute; inset: 0; opacity: 0; }
+.logo-word::before { color: var(--rust); animation: logo-split 5s steps(1, end) infinite; }
+.logo-word::after { color: var(--teal); animation: logo-split 5s steps(1, end) infinite reverse; }
+@keyframes logo-glitch { 0%, 88%, 100% { transform: none; } 89% { transform: translate(-3px, 1px) skewX(-8deg); } 91% { transform: translate(2px, 0); } 92% { transform: none; } }
+@keyframes logo-split { 0%, 87%, 94%, 100% { opacity: 0; transform: none; } 88% { opacity: .8; transform: translate(-5px, -2px); clip-path: inset(10% 0 55% 0); } 90% { opacity: .8; transform: translate(4px, 2px); clip-path: inset(50% 0 10% 0); } 92% { opacity: 0; } }
+.logo-sub { font-family: var(--pix); font-size: .55rem; color: var(--teal); letter-spacing: .4em; padding-left: .4em; }
+.thread { width: 100%; height: 44px; overflow: visible; }
+.thread path { fill: none; stroke: var(--rust); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-dasharray: 4 3; animation: thread-run 1.2s steps(7, end) infinite; filter: drop-shadow(0 0 3px rgba(181, 84, 60, .8)); }
+@keyframes thread-run { to { stroke-dashoffset: -14; } }
+.doors { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.door { all: unset; box-sizing: border-box; cursor: pointer; display: grid; justify-items: center; align-content: start; gap: 8px; padding: 12px 4px 10px; text-align: center; position: relative;
+  border: 12px solid transparent; border-image: var(--frame-rust) 4 / 12px / 0 stretch; background: var(--panel); background-clip: padding-box; transition: transform .2s steps(3); }
+.door:hover, .door:focus-visible { border-image-source: var(--frame-teal); transform: translateY(-3px); outline: none; }
+.door:hover .door-name, .door:focus-visible .door-name { color: var(--teal); text-shadow: 0 0 10px rgba(63, 179, 163, .6); }
+.door-art { display: block; width: 100%; aspect-ratio: 1; position: relative; }
+.door-name { font-family: var(--pix); font-size: .56rem; line-height: 1.7; color: var(--fg); min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.door-sub { font-size: .66rem; color: var(--muted); line-height: 1.4; }
+/* веер из трёх рубашек: медленно «дышит» */
+.fan-card { position: absolute; left: 50%; top: 50%; width: 40%; aspect-ratio: 2 / 3; background: center / cover; image-rendering: pixelated; box-shadow: 0 6px 14px rgba(0, 0, 0, .8); border: 1px solid #2a1d18; }
+.fan-card.f0 { transform: translate(-88%, -50%) rotate(-14deg); animation: fan0 4s steps(8, end) infinite; }
+.fan-card.f1 { transform: translate(-50%, -56%); z-index: 1; animation: fan1 4s steps(8, end) infinite; }
+.fan-card.f2 { transform: translate(-12%, -50%) rotate(14deg); animation: fan2 4s steps(8, end) infinite; }
+@keyframes fan0 { 50% { transform: translate(-96%, -50%) rotate(-19deg); } }
+@keyframes fan1 { 50% { transform: translate(-50%, -62%); } }
+@keyframes fan2 { 50% { transform: translate(-4%, -50%) rotate(19deg); } }
+/* малый натальный круг: кольцо знаков вращается, планеты мерцают */
+.mini-wheel { width: 100%; height: 100%; overflow: visible; }
+.mw-ring { transform-origin: 60px 60px; animation: mw-spin 60s steps(240, end) infinite; }
+.mw-ring circle, .mw-ring line { fill: none; stroke: var(--rust); stroke-width: 1; }
+.mw-ring text, .mw-planets text { font-size: 8px; text-anchor: middle; dominant-baseline: central; font-family: 'Apple Symbols', 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif; }
+.mw-ring text { fill: var(--muted); }
+.mw-planets text { fill: var(--fg); font-size: 10px; animation: mw-blink 3s steps(1, end) infinite; }
+.mw-aspect { fill: none; stroke: var(--teal); stroke-width: .8; opacity: .7; stroke-dasharray: 160; animation: mw-draw 6s steps(24, end) infinite; }
+.mw-core { fill: var(--rust); }
+@keyframes mw-spin { to { transform: rotate(-360deg); } }
+@keyframes mw-blink { 0%, 80%, 100% { opacity: 1; } 85% { opacity: .2; } }
+@keyframes mw-draw { 0% { stroke-dashoffset: 160; } 50%, 100% { stroke-dashoffset: 0; } }
+/* провал в дверь (длительность = DIVE_MS в ui/Menu.tsx) */
+.menu.diving .door:not(.dive), .menu.diving .logo, .menu.diving .lede, .menu.diving .thread, .menu.diving .greet { animation: menu-out .4s steps(4, end) forwards; }
+.door.dive { z-index: 5; animation: dive .65s steps(7, end) forwards; }
+@keyframes menu-out { to { opacity: 0; filter: blur(2px); } }
+@keyframes dive { 0% { transform: none; } 30% { transform: scale(1.08); filter: brightness(1.4); } 100% { transform: scale(3.2); opacity: 0; filter: brightness(2) blur(3px); } }
+
 /* натальные карты: список, форма */
 .actions .btn.wide { grid-column: 1 / -1; }
 .actions.three-btn { grid-template-columns: 1fr 1fr 1fr; }
@@ -233,16 +282,14 @@ button.pcard-wrap .pcard-flip:not(.flipped) { animation: breathe 2.4s steps(6, e
 .form-error { color: var(--bad); font-size: .8rem; }
 
 /* натальный круг: построение по шагам (тайминги = STAGE в natal/Wheel.tsx) */
-.wheel-wrap { display: grid; justify-items: center; }
+.wheel-wrap { display: grid; justify-items: center; position: relative; z-index: 1; }
+/* тёмная подложка: фон с глазами не просвечивает сквозь круг */
+.wheel-wrap::before { content: ''; position: absolute; left: 50%; top: 50%; width: min(100%, 420px); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, var(--bg) 66%, transparent 71%); z-index: -1; }
 .wheel { width: min(100%, 420px); aspect-ratio: 1; overflow: visible; font-family: var(--mono); user-select: none; -webkit-tap-highlight-color: transparent; }
 .w-ring { fill: none; stroke: var(--rust); stroke-width: 1.5; }
 .w-ring.dim { stroke: var(--dim); stroke-width: 1; stroke-dasharray: 2 3; }
 .w-tick { stroke: var(--rust); stroke-width: 1; }
-.w-glyph { font-size: 13px; text-anchor: middle; dominant-baseline: central; font-family: 'Apple Symbols', 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif; }
-.w-sign.el-0 .w-glyph { fill: #e07a4f; }
-.w-sign.el-1 .w-glyph { fill: #b9a77a; }
-.w-sign.el-2 .w-glyph { fill: #9fb8c9; }
-.w-sign.el-3 .w-glyph { fill: var(--teal); }
+.w-emblem { image-rendering: pixelated; }
 .w-house-area { fill: transparent; cursor: pointer; transition: fill .2s steps(2); }
 .w-house.on .w-house-area { fill: rgba(63, 179, 163, .14); }
 .w-cusp { stroke: var(--dim); stroke-width: 1; }
@@ -258,13 +305,14 @@ button.pcard-wrap .pcard-flip:not(.flipped) { animation: breathe 2.4s steps(6, e
 .w-aspect.off { stroke-opacity: .12; }
 .w-aspect.on { stroke-width: 2.2; filter: drop-shadow(0 0 3px currentColor); }
 .w-planet { cursor: pointer; }
-.w-planet-glyph { font-size: 14px; fill: var(--fg); text-anchor: middle; dominant-baseline: central; font-family: 'Apple Symbols', 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif; transition: fill-opacity .2s steps(2); }
+.w-planet-img { transition: opacity .2s steps(2); }
 .w-planet-hit { fill: transparent; }
 .w-planet-tick { stroke: var(--fg); stroke-width: 1; }
 .w-planet-dot { fill: var(--fg); }
 .w-retro { font-size: 6px; fill: var(--bad); font-family: var(--pix); }
-.w-planet.off .w-planet-glyph, .w-planet.off .w-planet-dot, .w-planet.off .w-planet-tick { fill-opacity: .25; stroke-opacity: .25; }
-.w-planet.sel .w-planet-glyph { fill: var(--teal); filter: drop-shadow(0 0 4px var(--teal)); }
+.w-planet.off .w-planet-img { opacity: .25; }
+.w-planet.off .w-planet-dot, .w-planet.off .w-planet-tick { fill-opacity: .25; stroke-opacity: .25; }
+.w-planet.sel .w-planet-img { transition: opacity .2s steps(2); }
 .w-core { fill: var(--rust); }
 
 .wheel:not(.instant) .w-sign { animation: w-fade .4s steps(4, end) both; }
@@ -276,16 +324,23 @@ button.pcard-wrap .pcard-flip:not(.flipped) { animation: breathe 2.4s steps(6, e
 @keyframes w-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes w-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes w-drop { 0% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.2); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
-.wheel-caption { min-height: 3.2em; text-align: center; display: grid; gap: 2px; }
+.wheel-caption { min-height: 4.2em; display: flex; align-items: center; justify-content: center; gap: 12px; text-align: center; }
+.cap-img { width: 64px; height: 64px; image-rendering: pixelated; flex: none; filter: drop-shadow(0 0 8px rgba(63, 179, 163, .35)); animation: reveal .3s steps(3, end) both; }
+.wheel-caption:has(.cap-img) { text-align: left; }
+.trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; margin: 4px 0 10px; }
+.trio figure { margin: 0; display: grid; justify-items: center; gap: 4px; text-align: center; font-size: .68rem; color: var(--muted); }
+.trio img { width: 72px; height: 72px; image-rendering: pixelated; }
+.trio b { font-weight: 400; color: var(--fg); font-family: var(--pix); font-size: .5rem; line-height: 2; }
 .cap-head { font-size: .8rem; color: var(--teal); }
 .cap-body { font-size: .74rem; color: var(--muted); }
 .natal-log .log { margin: 0; }
+.portrait-part .text + .text { margin-top: 12px; }
 .portrait-part { cursor: pointer; animation: reveal .5s steps(5, end) both; }
 .portrait-part.on { border-image-source: var(--frame-teal); }
 .portrait-part h2 { color: var(--rust); }
 .portrait-part.on h2 { color: var(--teal); }
 
 @media (prefers-reduced-motion: reduce) {
-  .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.corrupt, .portrait-part { animation: none !important; }
+  .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.corrupt, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect { animation: none !important; }
   .flipped::after { display: none; }
 }

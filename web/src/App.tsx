@@ -12,9 +12,10 @@ import { play, resumeSound } from './sound'
 import { haptic, initTelegram } from './telegram'
 import { Boot, shouldBoot } from './ui/Boot'
 import { Haunt } from './ui/Haunt'
+import { Menu } from './ui/Menu'
 import { StatusBar } from './ui/StatusBar'
 
-type Screen = 'home' | 'spread' | 'diary' | 'natal'
+type Screen = 'menu' | 'tarot' | 'spread' | 'diary' | 'natal'
 
 /** Сколько тасуется колода перед картой дня, мс; совпадает с .shuffle в styles.css. */
 const SHUFFLE_MS = 1100
@@ -35,7 +36,7 @@ function lastCardId(): number | null {
 }
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>('home')
+  const [screen, setScreen] = useState<Screen>('menu')
   const [booting, setBooting] = useState(shouldBoot)
   const go = (s: Screen) => {
     play('tap')
@@ -47,11 +48,20 @@ export function App() {
       <Haunt />
       {/* звук можно запустить только после жеста: первое касание возобновляет гул, если он включён */}
       <main className="app" onPointerDown={resumeSound}>
-        <StatusBar onHome={() => setScreen('home')} />
-        {screen === 'home' && <Home onSpread={() => go('spread')} onDiary={() => go('diary')} onNatal={() => go('natal')} />}
-        {screen === 'spread' && <Spread onBack={() => go('home')} />}
-        {screen === 'diary' && <Diary onBack={() => go('home')} />}
-        {screen === 'natal' && <NatalScreen onBack={() => go('home')} />}
+        <StatusBar onHome={() => setScreen('menu')} />
+        {screen === 'menu' && (
+          <Menu
+            greeting={tg.firstName ? `с возвращением, ${tg.firstName}` : 'пользователь опознан'}
+            onEnter={(d) => {
+              setScreen(d)
+              window.scrollTo({ top: 0 })
+            }}
+          />
+        )}
+        {screen === 'tarot' && <Tarot onSpread={() => go('spread')} onDiary={() => go('diary')} onMenu={() => go('menu')} />}
+        {screen === 'spread' && <Spread onBack={() => go('tarot')} />}
+        {screen === 'diary' && <Diary onBack={() => go('tarot')} />}
+        {screen === 'natal' && <NatalScreen onBack={() => go('menu')} />}
         <p className="disclaimer">
           Толкования носят рефлексивный и развлекательный характер и не заменяют советы врача, юриста или психолога.
         </p>
@@ -73,7 +83,8 @@ function Title({ children }: { children: string }) {
   )
 }
 
-function Home({ onSpread, onDiary, onNatal }: { onSpread: () => void; onDiary: () => void; onNatal: () => void }) {
+/** Раздел таро: карта дня, вход в расклад и дневник. */
+function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: () => void; onMenu: () => void }) {
   const today = useMemo(() => dayKey(), [])
   const [day, setDay] = useState(() => loadDayCard(today))
   const cardId = day ? day.cardId : null
@@ -111,9 +122,6 @@ function Home({ onSpread, onDiary, onNatal }: { onSpread: () => void; onDiary: (
   const card = cardId === null ? null : DECK[cardId]
   return (
     <section className="screen">
-      <p className="greet">
-        <span className="prompt">&gt;</span> {tg.firstName ? `с возвращением, ${tg.firstName}` : 'пользователь опознан'}
-      </p>
       <Title>Карта дня</Title>
       <p className="lede">Подумайте о том, что сегодня для вас важно, и коснитесь карты.</p>
       <div className="stage single altar">
@@ -151,8 +159,8 @@ function Home({ onSpread, onDiary, onNatal }: { onSpread: () => void; onDiary: (
         <button type="button" className="btn" onClick={onDiary}>
           Дневник
         </button>
-        <button type="button" className="btn wide" onClick={onNatal}>
-          Натальная карта
+        <button type="button" className="btn wide" onClick={onMenu}>
+          В меню
         </button>
       </div>
     </section>

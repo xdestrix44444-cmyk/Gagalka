@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
-import { ASPECTS, PLANETS, SIGN_GLYPHS, arc, norm, type Chart, type PlanetKey } from './chart'
+import { ASPECTS, PLANETS, SIGNS, arc, norm, type Chart, type PlanetKey } from './chart'
+import { planetEmblem, signEmblem } from './emblems'
 
 /** Тайминги построения круга, мс; лог в NatalChart идёт по тем же отметкам. */
 export const STAGE = { signs: 0, axes: 900, houses: 1300, planets: 2100, planetStep: 170, aspectStep: 110 }
@@ -7,11 +8,16 @@ export const planetsDone = () => STAGE.planets + PLANETS.length * STAGE.planetSt
 export const buildMs = (aspects: number) => planetsDone() + Math.min(aspects, 20) * STAGE.aspectStep + 300
 
 const C = 160
-const R_SIGN_OUT = 154
-const R_SIGN_IN = 132
-const R_PLANET = 113
-const R_HOUSE_NUM = 50
-const R_ASPECT = 92
+const R_SIGN_OUT = 157
+const R_SIGN_IN = 127
+const R_PLANET = 105
+const R_HOUSE_NUM = 46
+const R_ASPECT = 83
+/** Размер эмблем на круге, единицы viewBox (круг 320). */
+const SIGN_SIZE = 25
+const PLANET_SIZE = 23
+/** Минимальный зазор между эмблемами планет по кругу, градусы. */
+const PLANET_GAP = 12.5
 
 export interface Selection {
   planets?: PlanetKey[]
@@ -61,9 +67,9 @@ export function Wheel({ chart, focus, onPlanet, onHouse, instant }: Props) {
       const a = placed[i]
       const b = placed[(i + 1) % placed.length]
       const gap = arc(a.at, b.at)
-      if (gap < 9) {
-        a.at = norm(a.at - (9 - gap) / 2)
-        b.at = norm(b.at + (9 - gap) / 2)
+      if (gap < PLANET_GAP) {
+        a.at = norm(a.at - (PLANET_GAP - gap) / 2)
+        b.at = norm(b.at + (PLANET_GAP - gap) / 2)
       }
     }
   const atOf = (k: PlanetKey) => placed.find((p) => p.key === k)!.at
@@ -80,14 +86,14 @@ export function Wheel({ chart, focus, onPlanet, onHouse, instant }: Props) {
       <circle className="w-ring dim" cx={C} cy={C} r={R_ASPECT + 4} />
 
       {/* знаки зодиака */}
-      {SIGN_GLYPHS.map((g, i) => {
+      {SIGNS.map((name, i) => {
         const [x, y] = pt(i * 30 + 15, (R_SIGN_OUT + R_SIGN_IN) / 2)
         return (
           <g key={i} className={`w-sign el-${i % 4}`} style={delay(STAGE.signs + i * 70)}>
             <path className="w-tick" d={line(i * 30, R_SIGN_IN, R_SIGN_OUT)} pathLength={1} />
-            <text x={x} y={y} className="w-glyph">
-              {g}
-            </text>
+            <image href={signEmblem(i)} x={x - SIGN_SIZE / 2} y={y - SIGN_SIZE / 2} width={SIGN_SIZE} height={SIGN_SIZE} className="w-emblem">
+              <title>{name}</title>
+            </image>
           </g>
         )
       })}
@@ -167,12 +173,12 @@ export function Wheel({ chart, focus, onPlanet, onHouse, instant }: Props) {
           <g key={pl.key} className={cls} style={{ ...delay(STAGE.planets + i * STAGE.planetStep), '--dx': `${C - x}px`, '--dy': `${C - y}px` } as CSSProperties} onClick={() => onPlanet(pl.key)}>
             <path className="w-planet-tick" d={`M${tx} ${ty}L${pt(p.lon, R_SIGN_IN - 5)[0]} ${pt(p.lon, R_SIGN_IN - 5)[1]}`} />
             <circle className="w-planet-dot" cx={ix} cy={iy} r={1.6} />
-            <circle className="w-planet-hit" cx={x} cy={y} r={10} />
-            <text x={x} y={y} className="w-planet-glyph">
-              {pl.glyph + '︎'}
-            </text>
+            <circle className="w-planet-hit" cx={x} cy={y} r={PLANET_SIZE / 2 + 1} />
+            <image href={planetEmblem(pl.key)} x={x - PLANET_SIZE / 2} y={y - PLANET_SIZE / 2} width={PLANET_SIZE} height={PLANET_SIZE} className="w-emblem w-planet-img">
+              <title>{pl.name}</title>
+            </image>
             {p.retro && (
-              <text x={x + 7} y={y + 7} className="w-retro">
+              <text x={x + 9} y={y + 10} className="w-retro">
                 R
               </text>
             )}
