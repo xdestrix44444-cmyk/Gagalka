@@ -3,8 +3,8 @@ import { INTEGRITY_LABEL, integrityState, variantOf, type Arcana } from './deck'
 
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
-/** Толкование в виде терминального лога: строки появляются по одной. */
-export function Reading({ card: base, position, corrupt = false }: { card: Arcana; position?: string; corrupt?: boolean }) {
+/** Толкование в виде терминального лога: строки появляются по одной. delay — пауза до первой строки, мс (пока карта переворачивается). */
+export function Reading({ card: base, position, corrupt = false, delay = 0 }: { card: Arcana; position?: string; corrupt?: boolean; delay?: number }) {
   const card = variantOf(base, corrupt)
   const state = integrityState(card.integrity)
   const lines = [
@@ -18,9 +18,9 @@ export function Reading({ card: base, position, corrupt = false }: { card: Arcan
 
   useEffect(() => {
     if (shown >= total) return
-    const t = setTimeout(() => setShown((n) => n + 1), 220)
+    const t = setTimeout(() => setShown((n) => n + 1), shown === 0 ? Math.max(delay, 220) : 220)
     return () => clearTimeout(t)
-  }, [shown, total])
+  }, [shown, total, delay])
 
   return (
     <article className={corrupt ? 'reading corrupt' : 'reading'} aria-label={`${position ? position + ': ' : ''}${card.name}`}>
@@ -31,14 +31,15 @@ export function Reading({ card: base, position, corrupt = false }: { card: Arcan
             {i === 1 && <b> [{INTEGRITY_LABEL[state]}]</b>}
           </p>
         ))}
+        {shown < total && <p className="caret"><span className="prompt">&gt;</span> <span className="blink">_</span></p>}
       </div>
       {shown >= total && (
-        <>
+        <div className="reveal">
           <h2>
             {card.numeral} · {card.name}
           </h2>
           <p className="text">{card.text}</p>
-        </>
+        </div>
       )}
     </article>
   )

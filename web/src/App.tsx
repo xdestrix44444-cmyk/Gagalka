@@ -1,13 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { CREEP_LABEL, CREEP_LEVELS, rollCorrupt, type CreepLevel } from './creep'
 import { CORRUPT_TOTAL, DECK } from './deck'
 import { THREE_CARD_POSITIONS, cryptoRng, dayKey, drawCards } from './draw'
-import { PixelCard } from './PixelCard'
+import { FLIP_MS, PixelCard, ShuffleDeck } from './PixelCard'
 import { Reading } from './Reading'
 import { foundCorrupt, loadCreepLevel, loadDayCard, loadHistory, saveCreepLevel, saveDayCard, saveHistoryEntry } from './storage'
 import { haptic, initTelegram } from './telegram'
 
 type Screen = 'home' | 'spread' | 'diary'
+
+/** Сколько тасуется колода перед картой дня, мс; совпадает с .shuffle в styles.css. */
+const SHUFFLE_MS = 1100
+
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 const tg = initTelegram()
 
@@ -47,10 +52,24 @@ function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void
   const [day, setDay] = useState(() => loadDayCard(today))
   const [level, setLevel] = useState<CreepLevel>(loadCreepLevel)
   const cardId = day ? day.cardId : null
+  // тасование перед картой дня; justRevealed — карту открыли сейчас, а не раньше сегодня
+  const [shuffling, setShuffling] = useState(false)
+  const [justRevealed, setJustRevealed] = useState(false)
 
   const reveal = () => {
-    if (cardId !== null) return
+    if (cardId !== null || shuffling) return
     haptic()
+    if (prefersReducedMotion()) return pick()
+    setShuffling(true)
+    const pulses = [SHUFFLE_MS / 3, (SHUFFLE_MS * 2) / 3].map((t) => setTimeout(() => haptic(), t))
+    setTimeout(() => {
+      pulses.forEach(clearTimeout)
+      setShuffling(false)
+      pick()
+    }, SHUFFLE_MS)
+  }
+
+  const pick = () => {
     const [card] = drawCards(1)
     const corrupt = rollFor(card.id, lastCardId())
     if (corrupt) haptic('error')
@@ -58,6 +77,7 @@ function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void
     saveDayCard(today, entry)
     saveHistoryEntry({ kind: 'day', cards: [card.id], corrupt: corrupt ? [card.id] : [] })
     setDay(entry)
+    setJustRevealed(true)
   }
 
   const card = cardId === null ? null : DECK[cardId]
@@ -66,9 +86,13 @@ function Home({ onSpread, onDiary }: { onSpread: () => void; onDiary: () => void
       <h1>{tg.firstName ? `Привет, ${tg.firstName}` : 'Привет'}</h1>
       <p className="lede">Карта дня. Подумайте о том, что сегодня для вас важно, и откройте карту.</p>
       <div className="stage single">
-        <PixelCard id={cardId} corrupt={day?.corrupt} label={card ? `Карта дня: ${card.name}${day?.corrupt ? ' (повреждённая версия)' : ''}` : 'Карта дня, рубашка. Нажмите, чтобы открыть'} onClick={card ? undefined : reveal} />
-        {card && <Reading card={card} corrupt={day?.corrupt} />}
-        {!card && <p className="hint">Нажмите на карту</p>}
+        {shuffling ? (
+          <ShuffleDeck />
+        ) : (
+          <PixelCard id={cardId} corrupt={day?.corrupt} animate={justRevealed} label={card ? `Карта дня: ${card.name}${day?.corrupt ? ' (повреждённая версия)' : ''}` : 'Карта дня, рубашка. Нажмите, чтобы открыть'} onClick={card ? undefined : reveal} />
+        )}
+        {card && <Reading card={card} corrupt={day?.corrupt} delay={justRevealed ? FLIP_MS : 0} />}
+        {!card && <p className="hint">{shuffling ? 'Тасую колоду…' : 'Нажмите на карту'}</p>}
       </div>
       <div className="creep">
         <span id="creep-label">Жуть</span>
@@ -112,6 +136,8 @@ function Spread({ onBack }: { onBack: () => void }) {
     return { drawn, flags }
   }
   const [dealt, setDealt] = useState(deal)
+  // номер раздачи: новые карты всегда заново вылетают из колоды
+  const [round, setRound] = useState(0)
   const cards = dealt.drawn
   const flags = dealt.flags
   const [open, setOpen] = useState<boolean[]>([false, false, false])
@@ -120,15 +146,20 @@ function Spread({ onBack }: { onBack: () => void }) {
   const flip = (i: number) => {
     if (open[i]) return
     haptic()
-    const next = open.map((v, k) => (k === i ? true : v))
-    setOpen(next)
+    // функциональное обновление: быстрые нажатия подряд не теряют открытые карты
+    setOpen((prev) => prev.map((v, k) => (k === i ? true : v)))
     if (flags[i]) haptic('error')
-    if (next.every(Boolean))
-      saveHistoryEntry({ kind: 'three', cards: cards.map((c) => c.id), corrupt: cards.filter((_, k) => flags[k]).map((c) => c.id) })
   }
+
+  // расклад попадает в дневник, когда открыта последняя карта
+  useEffect(() => {
+    if (allOpen)
+      saveHistoryEntry({ kind: 'three', cards: cards.map((c) => c.id), corrupt: cards.filter((_, k) => flags[k]).map((c) => c.id) })
+  }, [allOpen])
 
   const again = () => {
     setDealt(deal())
+    setRound((r) => r + 1)
     setOpen([false, false, false])
   }
 
@@ -138,7 +169,7 @@ function Spread({ onBack }: { onBack: () => void }) {
       <p className="lede">Сформулируйте вопрос про себя и открывайте карты по порядку.</p>
       <div className="stage three">
         {cards.map((c, i) => (
-          <figure key={`${c.id}-${i}`} className="slot">
+          <figure key={`${round}-${i}`} className="slot deal" style={{ '--i': i } as CSSProperties}>
             <PixelCard
               id={open[i] ? c.id : null}
               corrupt={flags[i]}
@@ -156,7 +187,7 @@ function Spread({ onBack }: { onBack: () => void }) {
         {cards.map(
           (c, i) =>
             open[i] && (
-              <Reading key={`${c.id}-${i}`} card={c} corrupt={flags[i]} position={THREE_CARD_POSITIONS[i]} />
+              <Reading key={`${round}-${i}`} card={c} corrupt={flags[i]} position={THREE_CARD_POSITIONS[i]} delay={FLIP_MS} />
             ),
         )}
       </div>
