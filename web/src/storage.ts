@@ -3,8 +3,20 @@ export interface HistoryEntry {
   at: number
   kind: 'day' | 'three'
   cards: number[]
-  /** Номера карт из cards, выпавших в повреждённой версии. */
+  /** Целостность каждой карты из cards, по порядку. */
+  integrity?: number[]
+  /** Старый формат: номера карт, выпавших повреждёнными. */
   corrupt?: number[]
+}
+
+/** Целостность, которой заменяется старый флаг «повреждённая версия». */
+const LEGACY_DAMAGED = 30
+
+/** Целостность i-й карты записи; у старых записей восстанавливается из прежнего флага. */
+export function entryIntegrity(h: HistoryEntry, i: number): number | null {
+  if (h.integrity) return h.integrity[i] ?? null
+  if (h.corrupt) return h.corrupt.includes(h.cards[i]) ? LEGACY_DAMAGED : null
+  return null
 }
 
 const HISTORY_KEY = 'nit.history.v1'
@@ -39,23 +51,19 @@ export function saveHistoryEntry(entry: Omit<HistoryEntry, 'id' | 'at'>): Histor
 
 export interface DayCard {
   cardId: number
-  corrupt: boolean
+  integrity: number
   /** ИИ-толкование карты дня: сохраняем, чтобы не запрашивать повторно. */
   ai?: string
 }
 
 export function loadDayCard(day: string): DayCard | null {
-  const saved = read<{ day: string; cardId: number; corrupt?: boolean; ai?: string } | null>(DAY_KEY, null)
-  return saved && saved.day === day ? { cardId: saved.cardId, corrupt: !!saved.corrupt, ai: saved.ai } : null
+  const saved = read<{ day: string; cardId: number; integrity?: number; corrupt?: boolean; ai?: string } | null>(DAY_KEY, null)
+  if (!saved || saved.day !== day) return null
+  // карта дня, вытянутая до появления целостности: толкование сохранено, процент восстанавливаем из флага
+  const integrity = saved.integrity ?? (saved.corrupt ? LEGACY_DAMAGED : 95)
+  return { cardId: saved.cardId, integrity, ai: saved.ai }
 }
 
 export function saveDayCard(day: string, card: DayCard) {
   write(DAY_KEY, { day, ...card })
-}
-
-/** Номера карт, которые уже выпадали в повреждённой версии. */
-export function foundCorrupt(history: HistoryEntry[]): Set<number> {
-  const found = new Set<number>()
-  for (const h of history) h.corrupt?.forEach((id) => found.add(id))
-  return found
 }

@@ -1,12 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { INTEGRITY_LABEL, integrityState, variantOf, type Arcana } from './deck'
+import { INTEGRITY_LABEL, readingOf, type Arcana } from './deck'
 
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 interface Props {
   card: Arcana
   position?: string
-  corrupt?: boolean
+  /** Целостность, с которой выпала карта. */
+  integrity: number
   /** Пауза до первой строки лога, мс (пока карта переворачивается). */
   delay?: number
   /** Тело толкования после лога. По умолчанию временный текст колоды; null — только лог и имя. */
@@ -14,14 +15,15 @@ interface Props {
 }
 
 /** Толкование в виде терминального лога: строки появляются по одной, затем имя карты и текст. */
-export function Reading({ card: base, position, corrupt = false, delay = 0, body }: Props) {
-  const card = variantOf(base, corrupt)
-  const state = integrityState(card.integrity)
+export function Reading({ card, position, integrity, delay = 0, body }: Props) {
+  const r = readingOf(card, integrity)
+  const state = r.state
   const lines = [
     `загрузка ${card.file}${position ? ` · ${position.toLowerCase()}` : ''}`,
-    `целостность ${card.integrity}%`,
-    card.log[0],
-    card.log[1],
+    `целостность ${integrity}%`,
+    ...(r.reversed ? ['карта легла перевёрнутой: читаю тень'] : []),
+    r.log[0],
+    r.log[1],
   ]
   const total = lines.length + 1
   const [shown, setShown] = useState(() => (prefersReducedMotion() ? total : 0))
@@ -33,7 +35,7 @@ export function Reading({ card: base, position, corrupt = false, delay = 0, body
   }, [shown, total, delay])
 
   return (
-    <article className={corrupt ? 'reading corrupt' : 'reading'} aria-label={`${position ? position + ': ' : ''}${card.name}`}>
+    <article className={`reading ${state}`} aria-label={`${position ? position + ': ' : ''}${card.name}${r.reversed ? ', перевёрнута' : ''}`}>
       <div className="log" aria-hidden="true">
         {lines.slice(0, shown).map((line, i) => (
           <p key={i} className={i === 1 ? `state ${state}` : undefined}>
@@ -47,10 +49,25 @@ export function Reading({ card: base, position, corrupt = false, delay = 0, body
         <div className="reveal">
           <h2>
             {card.numeral} · {card.name}
+            {r.reversed && <span className="rev"> · перевёрнута</span>}
           </h2>
-          {body === undefined ? <p className="text">{card.text}</p> : body}
+          {body === undefined ? <ReadingText card={card} integrity={integrity} /> : body}
         </div>
       )}
     </article>
+  )
+}
+
+/** Временный текст колоды по целостности: прямое значение, помеха или тень. */
+export function ReadingText({ card, integrity, label }: { card: Arcana; integrity: number; label?: string }) {
+  const r = readingOf(card, integrity)
+  return (
+    <>
+      <p className="text">
+        {label && <b>{label}. </b>}
+        {r.text}
+      </p>
+      {r.noise && <p className="text noise">{r.noise}</p>}
+    </>
   )
 }

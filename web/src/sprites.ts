@@ -1,10 +1,10 @@
 // Колода «Нить»: карты из готовых рисунков (src/art/img через шаблон preset.ts, 320×480).
-// У Башни один рисунок на обе версии: повреждённую отличают подпись «ERR» и толкование.
+// Целостность ломает картинку кодом (damage): сдвиги строк, расслоение цвета, выпавшие блоки.
 // Шаблон: чёрные поля, тонкая рамка, номер сверху, имя снизу, штриховка строками и потёки.
 
 import { back } from './art/cards'
-import { H, Ink, W, frame, melt, toPixels } from './art/ink'
-import { presetFromImage } from './art/preset'
+import { AY1, H, Ink, W, frame, melt, toPixels } from './art/ink'
+import { K, presetFromImage } from './art/preset'
 import { DECK } from './deck'
 import backImg from './art/img/back.jpg'
 import foolImg from './art/img/00-fool.jpg'
@@ -43,18 +43,20 @@ function loadImage(src: string) {
 const pending = new WeakMap<HTMLCanvasElement, number>()
 let ticket = 0
 
-function paintImage(canvas: HTMLCanvasElement, src: string, top: string, bottom: string, framed = true) {
+function paintImage(canvas: HTMLCanvasElement, src: string, top: string, bottom: string, framed = true, integrity = 100, seed = 0) {
   const t = ++ticket
   pending.set(canvas, t)
   loadImage(src).then(
     (img) => {
-      if (pending.get(canvas) === t) presetFromImage(canvas, img, top, bottom, true, framed)
+      if (pending.get(canvas) !== t) return
+      presetFromImage(canvas, img, top, bottom, true, framed)
+      damage(canvas, integrity, seed)
     },
     () => {},
   )
 }
 
-function paint(canvas: HTMLCanvasElement, build: (ink: Ink) => void, top: string, bottom: string, corrupt = false) {
+function paint(canvas: HTMLCanvasElement, build: (ink: Ink) => void, top: string, bottom: string) {
   pending.delete(canvas)
   canvas.width = W
   canvas.height = H
@@ -62,21 +64,106 @@ function paint(canvas: HTMLCanvasElement, build: (ink: Ink) => void, top: string
   if (!ctx) return
   const ink = new Ink()
   build(ink)
-  melt(ink, 7, corrupt ? 80 : 16, corrupt ? 60 : 28)
+  melt(ink, 7, 16, 28)
   const d = toPixels(ink)
   frame(d, top, bottom)
   ctx.putImageData(new ImageData(d, W, H), 0, 0)
 }
 
-/** Лицевая сторона карты. Для карт без готового рисунка — рубашка. */
-export function drawCardFace(canvas: HTMLCanvasElement, id: number, corrupt = false) {
+/** Лицевая сторона карты с данной целостностью. Для карт без готового рисунка — рубашка. */
+export function drawCardFace(canvas: HTMLCanvasElement, id: number, integrity = 100) {
   const card = DECK[id]
-  const top = corrupt ? `${card.numeral} · ERR` : card.numeral
+  const top = integrity >= 90 ? card.numeral : `${card.numeral} · ${integrity < 60 ? 'ERR' : `${integrity}%`}`
   const bottom = card.name.toUpperCase()
   const src = ART[id]
   // пока грузится рисунок, видна рубашка; карты без рисунка остаются рубашкой
   drawCardBack(canvas)
-  if (src) paintImage(canvas, src, top, bottom)
+  if (src) paintImage(canvas, src, top, bottom, true, integrity, id * 101 + integrity)
+}
+
+/** Детерминированный генератор: одна и та же карта с той же целостностью ломается одинаково. */
+function seeded(seed: number) {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * Повреждение картинки по целостности: чем ниже процент, тем больше сдвинутых полос,
+ * сильнее расслоение каналов и больше выпавших блоков. Целая карта (90+) почти не тронута.
+ */
+export function damage(canvas: HTMLCanvasElement, integrity: number, seed: number) {
+  const s = Math.max(0, Math.min(1, (100 - integrity) / 100))
+  if (s < 0.02) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const w = canvas.width
+  // полоса с именем карты внизу не ломается: имя должно читаться даже у самой битой карты
+  const h = Math.min(canvas.height, (AY1 + 1) * K)
+  const img = ctx.getImageData(0, 0, w, h)
+  const d = img.data
+  const src = new Uint8ClampedArray(d)
+  const rnd = seeded(seed)
+  const at = (x: number, y: number) => (y * w + ((x % w) + w) % w) * 4
+
+  // сдвинутые полосы: сдвиг строк по горизонтали
+  const slices = Math.round(s * s * 14 + s * 3)
+  for (let k = 0; k < slices; k++) {
+    const y0 = Math.floor(rnd() * h)
+    const sh = 2 + Math.floor(rnd() * (3 + s * 10))
+    const off = Math.round((rnd() - 0.5) * 2 * (4 + s * 30))
+    for (let y = y0; y < Math.min(h, y0 + sh); y++)
+      for (let x = 0; x < w; x++) {
+        const t = at(x, y)
+        const f = at(x - off, y)
+        d[t] = src[f]
+        d[t + 1] = src[f + 1]
+        d[t + 2] = src[f + 2]
+      }
+  }
+
+  // расслоение каналов: красный уезжает вправо, синий влево
+  const split = Math.round(s * 4)
+  if (split > 0) {
+    const cur = new Uint8ClampedArray(d)
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const t = at(x, y)
+        d[t] = cur[at(x - split, y)]
+        d[t + 2] = cur[at(x + split, y) + 2]
+      }
+  }
+
+  // выпавшие блоки: только у сильно повреждённых карт, и немного — рисунок должен узнаваться
+  const blocks = s > 0.6 ? Math.round((s - 0.6) * 25) : 0
+  for (let k = 0; k < blocks; k++) {
+    const bw = 8 + Math.floor(rnd() * 40)
+    const bh = 4 + Math.floor(rnd() * 16)
+    const x0 = Math.floor(rnd() * (w - bw))
+    const y0 = Math.floor(rnd() * (h - bh))
+    const mode = rnd()
+    for (let y = y0; y < y0 + bh; y++)
+      for (let x = x0; x < x0 + bw; x++) {
+        const t = at(x, y)
+        if (mode < 0.4) d[t] = d[t + 1] = d[t + 2] = 4
+        else if (mode < 0.7) {
+          const g = rnd() < 0.5 ? 20 : 200
+          d[t] = g
+          d[t + 1] = g * 0.35
+          d[t + 2] = g * 0.45
+        } else {
+          d[t] = 255 - d[t]
+          d[t + 1] = 255 - d[t + 1]
+          d[t + 2] = 255 - d[t + 2]
+        }
+      }
+  }
+  ctx.putImageData(img, 0, 0)
 }
 
 export function drawCardBack(canvas: HTMLCanvasElement) {

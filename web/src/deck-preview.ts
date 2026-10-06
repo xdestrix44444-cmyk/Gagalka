@@ -14,6 +14,5 @@ const add = (draw: (c: HTMLCanvasElement) => void, caption: string) => {
 }
 add(drawCardBack, 'Рубашка')
 for (const c of ACTIVE_DECK) {
-  add((canvas) => drawCardFace(canvas, c.id), `${c.numeral} ${c.name}`)
-  if (c.corrupt) add((canvas) => drawCardFace(canvas, c.id, true), `${c.numeral} ${c.name} (повреждённая)`)
+  for (const integrity of [97, 74, 45, 12]) add((canvas) => drawCardFace(canvas, c.id, integrity), `${c.numeral} ${c.name} · ${integrity}%`)
 }

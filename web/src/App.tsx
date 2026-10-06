@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { rollCorrupt } from './creep'
+import { rollIntegrity } from './creep'
 import { AiText } from './AiText'
-import { CORRUPT_TOTAL, DECK, variantOf } from './deck'
+import { DECK, integrityState } from './deck'
 import { THREE_CARD_POSITIONS, cryptoRng, dayKey, drawCards } from './draw'
 import { QUESTION_MAX } from './reading-request'
 import { FLIP_MS, PixelCard, ShuffleDeck } from './PixelCard'
 import { NatalScreen } from './natal/NatalScreen'
-import { Reading } from './Reading'
-import { foundCorrupt, loadDayCard, loadHistory, saveDayCard, saveHistoryEntry } from './storage'
+import { Reading, ReadingText } from './Reading'
+import { entryIntegrity, loadDayCard, loadHistory, saveDayCard, saveHistoryEntry } from './storage'
 import { play, resumeSound } from './sound'
 import { haptic, initTelegram } from './telegram'
 import { Boot, shouldBoot } from './ui/Boot'
@@ -24,10 +24,19 @@ const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion:
 
 const tg = initTelegram()
 
-/** Бросает кубик «повреждённости» для карты; предыдущей считается последняя карта дневника. */
-function rollFor(cardId: number, previousCardId: number | null): boolean {
-  if (!DECK[cardId].corrupt) return false
-  return rollCorrupt({ date: new Date(), previousCardId, cardId }, cryptoRng)
+/** Целостность карты в этот раз; предыдущей считается последняя карта дневника. */
+function rollFor(cardId: number, previousCardId: number | null): number {
+  return rollIntegrity({ date: new Date(), previousCardId, cardId }, cryptoRng)
+}
+
+/** Звук и вибрация в момент, когда открылась карта: повреждённая сбоит, с помехой шипит. */
+function revealFx(integrity: number) {
+  play('flip')
+  const state = integrityState(integrity)
+  if (state === 'damaged') {
+    haptic('error')
+    play('corrupt')
+  } else if (state === 'partial') play('static')
 }
 
 function lastCardId(): number | null {
@@ -108,13 +117,11 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
 
   const pick = () => {
     const [card] = drawCards(1)
-    const corrupt = rollFor(card.id, lastCardId())
-    if (corrupt) haptic('error')
-    play('flip')
-    if (corrupt) play('corrupt')
-    const entry = { cardId: card.id, corrupt }
+    const integrity = rollFor(card.id, lastCardId())
+    revealFx(integrity)
+    const entry = { cardId: card.id, integrity }
     saveDayCard(today, entry)
-    saveHistoryEntry({ kind: 'day', cards: [card.id], corrupt: corrupt ? [card.id] : [] })
+    saveHistoryEntry({ kind: 'day', cards: [card.id], integrity: [integrity] })
     setDay(entry)
     setJustRevealed(true)
   }
@@ -128,18 +135,18 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
         {shuffling ? (
           <ShuffleDeck />
         ) : (
-          <PixelCard id={cardId} corrupt={day?.corrupt} animate={justRevealed} label={card ? `Карта дня: ${card.name}${day?.corrupt ? ' (повреждённая версия)' : ''}` : 'Карта дня, рубашка. Нажмите, чтобы открыть'} onClick={card ? undefined : reveal} />
+          <PixelCard id={cardId} integrity={day?.integrity} animate={justRevealed} label={card && day ? `Карта дня: ${card.name}, целостность ${day.integrity}%` : 'Карта дня, рубашка. Нажмите, чтобы открыть'} onClick={card ? undefined : reveal} />
         )}
         {card && day && (
           <Reading
             card={card}
-            corrupt={day.corrupt}
+            integrity={day.integrity}
             delay={justRevealed ? FLIP_MS : 0}
             body={
               <AiText
-                request={{ kind: 'day', cards: [{ id: card.id, corrupt: day.corrupt }] }}
+                request={{ kind: 'day', cards: [{ id: card.id, integrity: day.integrity }] }}
                 saved={day.ai}
-                fallback={<p className="text">{variantOf(card, day.corrupt).text}</p>}
+                fallback={<ReadingText card={card} integrity={day.integrity} />}
                 onDone={(ai) => {
                   const next = { ...day, ai }
                   saveDayCard(today, next)
@@ -171,18 +178,18 @@ function Spread({ onBack }: { onBack: () => void }) {
   const deal = () => {
     const drawn = drawCards(3)
     let prev = lastCardId()
-    const flags = drawn.map((c) => {
-      const f = rollFor(c.id, prev)
+    const integrity = drawn.map((c) => {
+      const v = rollFor(c.id, prev)
       prev = c.id
-      return f
+      return v
     })
-    return { drawn, flags }
+    return { drawn, integrity }
   }
   const [dealt, setDealt] = useState(deal)
   // номер раздачи: новые карты всегда заново вылетают из колоды
   const [round, setRound] = useState(0)
   const cards = dealt.drawn
-  const flags = dealt.flags
+  const integrity = dealt.integrity
   const [open, setOpen] = useState<boolean[]>([false, false, false])
   const allOpen = open.every(Boolean)
   const started = open.some(Boolean)
@@ -191,19 +198,15 @@ function Spread({ onBack }: { onBack: () => void }) {
   const flip = (i: number) => {
     if (open[i]) return
     haptic()
-    play('flip')
+    revealFx(integrity[i])
     // функциональное обновление: быстрые нажатия подряд не теряют открытые карты
     setOpen((prev) => prev.map((v, k) => (k === i ? true : v)))
-    if (flags[i]) {
-      haptic('error')
-      play('corrupt')
-    }
   }
 
   // расклад попадает в дневник, когда открыта последняя карта
   useEffect(() => {
     if (allOpen)
-      saveHistoryEntry({ kind: 'three', cards: cards.map((c) => c.id), corrupt: cards.filter((_, k) => flags[k]).map((c) => c.id) })
+      saveHistoryEntry({ kind: 'three', cards: cards.map((c) => c.id), integrity })
   }, [allOpen])
 
   const again = () => {
@@ -231,8 +234,8 @@ function Spread({ onBack }: { onBack: () => void }) {
           <figure key={`${round}-${i}`} className="slot deal" style={{ '--i': i } as CSSProperties}>
             <PixelCard
               id={open[i] ? c.id : null}
-              corrupt={flags[i]}
-              label={open[i] ? `${THREE_CARD_POSITIONS[i]}: ${c.name}` : `${THREE_CARD_POSITIONS[i]}, рубашка. Нажмите, чтобы открыть`}
+              integrity={integrity[i]}
+              label={open[i] ? `${THREE_CARD_POSITIONS[i]}: ${c.name}, целостность ${integrity[i]}%` : `${THREE_CARD_POSITIONS[i]}, рубашка. Нажмите, чтобы открыть`}
               onClick={open[i] ? undefined : () => flip(i)}
             />
             <figcaption>
@@ -246,19 +249,17 @@ function Spread({ onBack }: { onBack: () => void }) {
         {cards.map(
           (c, i) =>
             open[i] && (
-              <Reading key={`${round}-${i}`} card={c} corrupt={flags[i]} position={THREE_CARD_POSITIONS[i]} delay={FLIP_MS} body={null} />
+              <Reading key={`${round}-${i}`} card={c} integrity={integrity[i]} position={THREE_CARD_POSITIONS[i]} delay={FLIP_MS} body={null} />
             ),
         )}
         {allOpen && (
           <article key={round} className="reading summary">
             <h2>&gt; толкование расклада</h2>
             <AiText
-              request={{ kind: 'three', cards: cards.map((c, i) => ({ id: c.id, corrupt: flags[i] })), question: question.trim() || undefined }}
+              request={{ kind: 'three', cards: cards.map((c, i) => ({ id: c.id, integrity: integrity[i] })), question: question.trim() || undefined }}
               delay={FLIP_MS + 1400}
               fallback={cards.map((c, i) => (
-                <p key={i} className="text">
-                  <b>{THREE_CARD_POSITIONS[i]}.</b> {variantOf(c, flags[i]).text}
-                </p>
+                <ReadingText key={i} card={c} integrity={integrity[i]} label={THREE_CARD_POSITIONS[i]} />
               ))}
             />
           </article>
@@ -281,14 +282,10 @@ function Spread({ onBack }: { onBack: () => void }) {
 
 function Diary({ onBack }: { onBack: () => void }) {
   const history = useMemo(() => loadHistory(), [])
-  const found = useMemo(() => foundCorrupt(history), [history])
   const fmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
   return (
     <section className="screen">
       <Title>Дневник</Title>
-      <p className="found">
-        <span className="prompt">&gt;</span> найдено повреждённых файлов: {found.size} из {CORRUPT_TOTAL}
-      </p>
       {history.length === 0 ? (
         <p className="lede">Здесь появятся ваши расклады. Откройте карту дня или сделайте первый расклад.</p>
       ) : (
@@ -299,13 +296,17 @@ function Diary({ onBack }: { onBack: () => void }) {
                 [{fmt.format(h.at)}] <span className="kind">{h.kind === 'day' ? 'карта дня' : 'три карты'}</span>
               </span>
               <span className="names">
-                {h.cards.map((id, i) => (
-                  <span key={i} className={h.corrupt?.includes(id) ? 'bad' : undefined}>
-                    {i > 0 && ', '}
-                    {DECK[id].name}
-                    {h.corrupt?.includes(id) && ' (повреждённая)'}
-                  </span>
-                ))}
+                {h.cards.map((id, i) => {
+                  const v = entryIntegrity(h, i)
+                  const state = v === null ? 'whole' : integrityState(v)
+                  return (
+                    <span key={i} className={state}>
+                      {i > 0 && ', '}
+                      {DECK[id].name}
+                      {v !== null && <span className="pct"> {v}%{state === 'damaged' && ' ↓'}</span>}
+                    </span>
+                  )
+                })}
               </span>
             </li>
           ))}

@@ -75,15 +75,25 @@ describe('целостность карт', () => {
   })
 })
 
-describe('повреждённые версии', () => {
-  it('у Башни и Луны есть повреждённая версия с логом и текстом; в игре пока только Башня', async () => {
-    const { CORRUPT_TOTAL, variantOf } = await import('./deck')
-    expect(CORRUPT_TOTAL).toBe(1)
-    for (const id of [16, 18]) {
-      const v = variantOf(DECK[id], true)
-      expect(v.log).toHaveLength(2)
-      expect(v.integrity).toBeLessThan(DECK[id].integrity)
-      expect(variantOf(DECK[id], false)).toBe(DECK[id])
+describe('толкование по целостности', () => {
+  it('у каждой карты в игре есть помеха и тень', async () => {
+    const { LAYERS } = await import('./layers')
+    for (const c of ACTIVE_DECK) {
+      expect(LAYERS[c.id]?.noise.length).toBeGreaterThan(40)
+      expect(LAYERS[c.id]?.shadow.log).toHaveLength(2)
+      expect(LAYERS[c.id]?.shadow.text.length).toBeGreaterThan(40)
     }
+  })
+
+  it('целая — прямое значение, частично — с помехой, повреждённая — перевёрнутая тень', async () => {
+    const { readingOf } = await import('./deck')
+    const tower = DECK[16]
+    expect(readingOf(tower, 95)).toMatchObject({ state: 'whole', reversed: false, text: tower.text, noise: undefined })
+    expect(readingOf(tower, 70)).toMatchObject({ state: 'partial', reversed: false, text: tower.text })
+    expect(readingOf(tower, 70).noise).toMatch(/^Помеха/)
+    const dmg = readingOf(tower, 30)
+    expect(dmg).toMatchObject({ state: 'damaged', reversed: true })
+    expect(dmg.text).not.toBe(tower.text)
+    expect(dmg.log).toEqual(['обрушение отложено', 'нагрузка на опоры растёт'])
   })
 })

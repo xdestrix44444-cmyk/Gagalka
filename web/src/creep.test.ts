@@ -1,36 +1,58 @@
 import { describe, expect, it } from 'vitest'
-import { BASE_CHANCE, MAX_CHANCE, corruptChance, isFriday13, isNewMoon, isNight, moonAge } from './creep'
+import { BASE_DAMAGE, MAX_DAMAGE, damageChance, isFriday13, isNewMoon, isNight, moonAge, rollIntegrity } from './creep'
+import { integrityState } from './deck'
 
 const noon = new Date(2026, 9, 6, 12, 0)
 const base = { date: noon, previousCardId: null, cardId: 18 }
 
-describe('corruptChance', () => {
+describe('damageChance', () => {
   it('днём без условий равна базовому шансу', () => {
     // 6 октября 2026 далеко от новолуния и не пятница 13-е
     expect(isNewMoon(noon)).toBe(false)
-    expect(corruptChance(base)).toBeCloseTo(BASE_CHANCE)
+    expect(damageChance(base)).toBeCloseTo(BASE_DAMAGE)
   })
 
-  it('ночью вдвое выше', () => {
+  it('ночью и при повторной карте подряд выше', () => {
     const night = new Date(2026, 9, 6, 23, 30)
     expect(isNight(night)).toBe(true)
-    expect(corruptChance({ ...base, date: night })).toBeCloseTo(BASE_CHANCE * 2)
+    expect(damageChance({ ...base, date: night })).toBeCloseTo(BASE_DAMAGE * 1.4)
+    expect(damageChance({ ...base, previousCardId: 18 })).toBeCloseTo(BASE_DAMAGE * 1.4)
+    expect(damageChance({ ...base, previousCardId: 16 })).toBeCloseTo(BASE_DAMAGE)
   })
 
-  it('при повторной карте подряд вдвое выше', () => {
-    expect(corruptChance({ ...base, previousCardId: 18 })).toBeCloseTo(BASE_CHANCE * 2)
-    expect(corruptChance({ ...base, previousCardId: 16 })).toBeCloseTo(BASE_CHANCE)
-  })
-
-  it('в пятницу 13-го втрое выше', () => {
+  it('в пятницу 13-го вдвое выше, но никогда не выше потолка', () => {
     const f13 = new Date(2026, 10, 13, 12, 0)
     expect(isFriday13(f13)).toBe(true)
-    expect(corruptChance({ ...base, date: f13 })).toBeGreaterThanOrEqual(BASE_CHANCE * 3 - 1e-9)
+    expect(damageChance({ ...base, date: f13 })).toBeCloseTo(BASE_DAMAGE * 2)
+    const worst = new Date(2026, 10, 13, 23, 0)
+    expect(damageChance({ ...base, date: worst, previousCardId: 18 })).toBe(MAX_DAMAGE)
+  })
+})
+
+describe('rollIntegrity', () => {
+  const fixed = (...xs: number[]) => {
+    let i = 0
+    return () => xs[i++ % xs.length]
+  }
+
+  it('первое число выбирает состояние, второе — процент внутри него', () => {
+    expect(rollIntegrity(base, fixed(0, 0))).toBe(5)
+    expect(rollIntegrity(base, fixed(0.24, 0.999))).toBe(59)
+    expect(rollIntegrity(base, fixed(0.3, 0))).toBe(60)
+    expect(rollIntegrity(base, fixed(0.49, 0.999))).toBe(89)
+    expect(rollIntegrity(base, fixed(0.5, 0))).toBe(90)
+    expect(rollIntegrity(base, fixed(0.99, 0.999))).toBe(100)
   })
 
-  it('никогда не выше потолка', () => {
-    const worst = new Date(2026, 10, 13, 23, 0)
-    expect(corruptChance({ ...base, date: worst, previousCardId: 18 })).toBeLessThanOrEqual(MAX_CHANCE)
+  it('в обычный день примерно половина целых и по четверти остальных', () => {
+    let s = 7
+    const rng = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646
+    const n = 20000
+    const counts = { whole: 0, partial: 0, damaged: 0 }
+    for (let i = 0; i < n; i++) counts[integrityState(rollIntegrity(base, rng))]++
+    expect(counts.whole / n).toBeCloseTo(0.5, 1)
+    expect(counts.partial / n).toBeCloseTo(0.25, 1)
+    expect(counts.damaged / n).toBeCloseTo(0.25, 1)
   })
 })
 

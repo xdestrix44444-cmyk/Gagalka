@@ -94,9 +94,11 @@ div.pcard-wrap { cursor: default; }
 .log { font-family: var(--mono); font-size: .76rem; line-height: 1.6; color: #b9b2a5; display: grid; gap: 2px; margin-bottom: 10px; }
 .log .state.partial { color: var(--warn); }
 .log .state.damaged { color: var(--bad); }
-.reading.corrupt { border-image-source: var(--frame-rust); animation: corrupt-border 2.4s steps(1, end) infinite; }
+.reading.damaged { border-image-source: var(--frame-rust); animation: corrupt-border 2.4s steps(1, end) infinite; }
 @keyframes corrupt-border { 0%, 90%, 100% { filter: none; } 91% { filter: hue-rotate(-30deg) saturate(2); } 94% { filter: none; } }
-.reading.corrupt .log, .reading.corrupt h2 { color: var(--bad); }
+.reading.damaged .log, .reading.damaged h2 { color: var(--bad); }
+.reading h2 .rev { font-size: .7em; letter-spacing: .04em; }
+.text.noise { color: var(--warn); font-style: italic; }
 
 /* кнопки и переключатели */
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto; }
@@ -117,13 +119,14 @@ div.pcard-wrap { cursor: default; }
 .asked { font-family: var(--serif); font-style: italic; text-align: center; color: var(--fg); }
 
 /* дневник */
-.found { color: var(--bad); font-size: .76rem; }
 .diary { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .diary li { display: grid; gap: 2px; padding: 2px 6px; font-size: .8rem; }
 .diary .when { color: var(--muted); font-size: .72rem; }
 .diary .kind { color: var(--teal); text-transform: uppercase; }
 .diary .names { font-family: var(--serif); font-size: 1rem; }
-.diary .bad { color: var(--bad); }
+.diary .pct { font-family: var(--mono, monospace); font-size: .72rem; color: var(--muted); }
+.diary .partial .pct { color: var(--warn); }
+.diary .damaged, .diary .damaged .pct { color: var(--bad); }
 .disclaimer { font-size: .66rem; color: #5f5a52; text-align: center; }
 
 /* экран входа */
@@ -158,9 +161,11 @@ div.pcard-wrap { cursor: default; }
 button.pcard-wrap .pcard-flip:not(.flipped) { animation: breathe 2.4s steps(6, end) infinite; }
 @keyframes breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 
-/* повреждённая версия: сбой сразу после переворота, затем редкое мерцание */
-.flipped.corrupt .side.face { animation: flicker 3.2s steps(1, end) 1.4s infinite; }
-.flipped.corrupt:not(.instant) { animation: glitch .6s steps(1, end) .64s both; }
+/* целостность: повреждённая карта лежит вверх ногами и сбоит после переворота, с помехой — изредка мерцает */
+.flipped.damaged .pcard-inner .face { transform: rotateY(180deg) rotate(180deg); }
+.flipped.damaged .side.face { animation: flicker 3.2s steps(1, end) 1.4s infinite; }
+.flipped.damaged:not(.instant) { animation: glitch .6s steps(1, end) .64s both; }
+.flipped.partial .side.face { animation: flicker 7s steps(1, end) 2s infinite; }
 @keyframes glitch {
   0% { transform: translate(0); filter: none; }
   15% { transform: translate(-5px, 2px); filter: hue-rotate(140deg) contrast(1.6); }
@@ -415,7 +420,7 @@ button.pcard-wrap .pcard-flip:not(.flipped) { animation: breathe 2.4s steps(6, e
 .portrait-part.on h2 { color: var(--teal); }
 
 @media (prefers-reduced-motion: reduce) {
-  .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.corrupt, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
+  .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
   .wheel { transition: none; }
   .flipped::after { display: none; }
 }

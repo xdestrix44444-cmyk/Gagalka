@@ -1,9 +1,10 @@
-// «Повреждённые» версии карт: редкая жуткая версия вместо обычной.
-// Смысл толкования остаётся добрым, меняются картинка и системный лог.
+// Целостность карты: насколько ясно она читается в этот раз. Выпадает заново при каждом вытягивании.
+// ЦЕЛ — прямое значение, ЧАСТИЧНО — прямое с помехой, ПОВРЕЖДЁН — карта перевёрнута, читается её тень.
 
-/** Базовый шанс повреждённой версии у карты, у которой она есть: примерно 1 из 12. */
-export const BASE_CHANCE = 1 / 12
-export const MAX_CHANCE = 0.5
+/** Шансы состояний в обычный день: половина целых, четверть с помехой, четверть повреждённых. */
+export const BASE_DAMAGE = 0.25
+export const PARTIAL = 0.25
+export const MAX_DAMAGE = 0.6
 
 const SYNODIC = 29.530588853
 const KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14)
@@ -28,23 +29,29 @@ export function isFriday13(date: Date): boolean {
   return date.getDay() === 5 && date.getDate() === 13
 }
 
-export interface CreepContext {
+export interface IntegrityContext {
   date: Date
   /** Карта, выпавшая прошлой в дневнике, если есть. */
   previousCardId: number | null
   cardId: number
 }
 
-/** Вероятность повреждённой версии: ночью, в новолуние, при повторной карте и в пятницу 13-го она растёт. */
-export function corruptChance(ctx: CreepContext): number {
-  let p = BASE_CHANCE
-  if (isNight(ctx.date)) p *= 2
-  if (isNewMoon(ctx.date)) p *= 2
-  if (ctx.previousCardId === ctx.cardId) p *= 2
-  if (isFriday13(ctx.date)) p *= 3
-  return Math.min(p, MAX_CHANCE)
+/** Шанс повреждённой карты: ночью, в новолуние, при повторной карте подряд и в пятницу 13-го он растёт. */
+export function damageChance(ctx: IntegrityContext): number {
+  let p = BASE_DAMAGE
+  if (isNight(ctx.date)) p *= 1.4
+  if (isNewMoon(ctx.date)) p *= 1.4
+  if (ctx.previousCardId === ctx.cardId) p *= 1.4
+  if (isFriday13(ctx.date)) p *= 2
+  return Math.min(p, MAX_DAMAGE)
 }
 
-export function rollCorrupt(ctx: CreepContext, rng: () => number): boolean {
-  return rng() < corruptChance(ctx)
+/** Целостность 1–100: сначала выбирается состояние, затем процент внутри него. */
+export function rollIntegrity(ctx: IntegrityContext, rng: () => number): number {
+  const u = rng()
+  const v = rng()
+  const dmg = damageChance(ctx)
+  if (u < dmg) return 5 + Math.floor(v * 55) // 5–59
+  if (u < dmg + PARTIAL) return 60 + Math.floor(v * 30) // 60–89
+  return 90 + Math.floor(v * 11) // 90–100
 }

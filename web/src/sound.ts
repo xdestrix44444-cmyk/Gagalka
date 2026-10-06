@@ -129,7 +129,7 @@ function tone(freq: number, dur: number, vol: number, type: OscillatorType = 'sq
   o.stop(t + dur + 0.02)
 }
 
-export type Sfx = 'tap' | 'shuffle' | 'flip' | 'corrupt' | 'boot' | 'type'
+export type Sfx = 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type'
 
 export function play(sfx: Sfx) {
   if (!soundEnabled()) return
@@ -146,6 +146,9 @@ export function play(sfx: Sfx) {
     case 'flip':
       burst(1200, 0.8, 0.09, 0.3)
       tone(196, 0.35, 0.05, 'triangle', 0.05, 147)
+      break
+    case 'static':
+      burst(2400, 3, 0.35, 0.04, 0.64)
       break
     case 'corrupt':
       for (let i = 0; i < 8; i++) tone(80 + Math.random() * 900, 0.05, 0.07, 'square', 0.64 + i * 0.05)

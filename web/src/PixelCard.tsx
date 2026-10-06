@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { integrityState } from './deck'
 import { drawCardBack, drawCardFace } from './sprites'
 
 /** Длительность переворота, мс; совпадает с .pcard-inner в styles.css. */
@@ -8,8 +9,8 @@ interface Props {
   /** Номер карты 0–77; null показывает рубашку. */
   id: number | null
   label: string
-  /** Повреждённая версия карты. */
-  corrupt?: boolean
+  /** Целостность, с которой выпала карта: ломает картинку, а ниже 60% карта ложится вверх ногами. */
+  integrity?: number
   /** Переворачивать, даже если карта появилась уже открытой (например, сразу после тасования). */
   animate?: boolean
   onClick?: () => void
@@ -19,7 +20,7 @@ interface Props {
  * Карта с двумя сторонами. Переход рубашка → лицо анимируется переворотом;
  * карта, которая уже была открыта при появлении на экране, показывается сразу.
  */
-export function PixelCard({ id, label, corrupt = false, animate = false, onClick }: Props) {
+export function PixelCard({ id, label, integrity = 100, animate = false, onClick }: Props) {
   const backRef = useRef<HTMLCanvasElement>(null)
   const faceRef = useRef<HTMLCanvasElement>(null)
   // открыта ли карта с самого начала: тогда без анимации
@@ -30,10 +31,11 @@ export function PixelCard({ id, label, corrupt = false, animate = false, onClick
   }, [])
 
   useEffect(() => {
-    if (faceRef.current && id !== null) drawCardFace(faceRef.current, id, corrupt)
-  }, [id, corrupt])
+    if (faceRef.current && id !== null) drawCardFace(faceRef.current, id, integrity)
+  }, [id, integrity])
 
-  const cls = ['pcard-flip', id !== null && 'flipped', instant && 'instant', corrupt && 'corrupt'].filter(Boolean).join(' ')
+  const state = integrityState(integrity)
+  const cls = ['pcard-flip', id !== null && 'flipped', instant && 'instant', state !== 'whole' && state].filter(Boolean).join(' ')
   const card = (
     <div className={cls}>
       <div className="pcard-inner">
