@@ -3,12 +3,12 @@ import backImg from '../art/img/back.jpg'
 import { PLANETS, SIGN_GLYPHS } from '../natal/chart'
 import { play } from '../sound'
 
-export type Door = 'tarot' | 'natal'
+export type Door = 'tarot' | 'natal' | 'matrix'
 
 /** Сколько длится «провал» в выбранную дверь, мс; совпадает с .door.dive в styles.css. */
 const DIVE_MS = 650
 
-/** Меню входа: две двери — таро и натальная карта. Выбранная дверь затягивает экран внутрь. */
+/** Меню входа: три двери — таро, натальная карта и матрица судьбы. Выбранная дверь затягивает экран внутрь. */
 export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Door) => void }) {
   const [diving, setDiving] = useState<Door | null>(null)
 
@@ -35,10 +35,11 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
       </div>
       <p className="lede">Выберите, за какую нить потянуть.</p>
 
-      {/* нить: спускается от названия и расходится к двум дверям */}
+      {/* нить: спускается от названия и расходится к трём дверям */}
       <svg className="thread" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M100 0 V14 Q100 22 50 26 V40" />
-        <path d="M100 0 V14 Q100 22 150 26 V40" />
+        <path d="M100 0 V14 Q100 22 33 26 V40" />
+        <path d="M100 0 V40" />
+        <path d="M100 0 V14 Q100 22 167 26 V40" />
       </svg>
 
       <div className="doors">
@@ -86,6 +87,27 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
           </span>
           <span className="door-name">Натальная<br />карта</span>
           <span className="door-sub">небо в момент рождения</span>
+        </button>
+
+        <button type="button" className={`door matrix${diving === 'matrix' ? ' dive' : ''}`} onClick={() => enter('matrix')} onPointerEnter={() => play('type')}>
+          <span className="door-art" aria-hidden="true">
+            {/* восьмиугольник матрицы: два квадрата медленно вращаются навстречу друг другу */}
+            <svg className="mini-matrix" viewBox="0 0 120 120">
+              <circle className="mm-ring" cx="60" cy="60" r="54" />
+              <g className="mm-sq a">
+                <rect x="22" y="22" width="76" height="76" />
+              </g>
+              <g className="mm-sq b">
+                <rect x="22" y="22" width="76" height="76" transform="rotate(45 60 60)" />
+              </g>
+              {[[6, 60], [60, 6], [114, 60], [60, 114]].map(([x, y], i) => (
+                <circle key={i} className="mm-dot" cx={x} cy={y} r="5" style={{ animationDelay: `${i * 0.5}s` }} />
+              ))}
+              <circle className="mm-core" cx="60" cy="60" r="7" />
+            </svg>
+          </span>
+          <span className="door-name">Матрица<br />судьбы</span>
+          <span className="door-sub">22 аркана из даты</span>
         </button>
       </div>
     </section>

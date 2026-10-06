@@ -22,7 +22,7 @@ const fmtDeg = (deg: number) => `${Math.floor(deg)}°${String(Math.floor((deg % 
 const planetName = (k: PlanetKey) => PLANETS.find((p) => p.key === k)!.name
 /** Творительный падеж для подписи связей: «трин с Юпитером». */
 const PLANET_WITH: Record<PlanetKey, string> = { sun: 'Солнцем', moon: 'Луной', mercury: 'Меркурием', venus: 'Венерой', mars: 'Марсом', jupiter: 'Юпитером', saturn: 'Сатурном', uranus: 'Ураном', neptune: 'Нептуном', pluto: 'Плутоном' }
-const fmtDate = (d: string) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${d}T12:00:00`))
+export const fmtDate = (d: string) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${d}T12:00:00`))
 
 type View = { kind: 'list' } | { kind: 'form'; person?: Person } | { kind: 'chart'; person: Person } | { kind: 'synastry' }
 
@@ -109,7 +109,7 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
   )
 }
 
-function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: Person; firstSelf: boolean; onSave: (p: Person) => void; onCancel: () => void }) {
+export function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: Person; firstSelf: boolean; onSave: (p: Person) => void; onCancel: () => void }) {
   const [name, setName] = useState(person?.name ?? '')
   const [date, setDate] = useState(person?.date ?? '')
   const [time, setTime] = useState(person?.time ?? '')

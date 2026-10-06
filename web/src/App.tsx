@@ -5,6 +5,7 @@ import { DECK, integrityState } from './deck'
 import { THREE_CARD_POSITIONS, cryptoRng, dayKey, drawCards } from './draw'
 import { QUESTION_MAX } from './reading-request'
 import { FLIP_MS, PixelCard, ShuffleDeck } from './PixelCard'
+import { MatrixScreen } from './matrix/MatrixScreen'
 import { NatalScreen } from './natal/NatalScreen'
 import { Reading, ReadingText } from './Reading'
 import { entryIntegrity, loadDayCard, loadHistory, saveDayCard, saveHistoryEntry } from './storage'
@@ -16,7 +17,7 @@ import { Menu } from './ui/Menu'
 import { ScreenHead } from './ui/ScreenHead'
 import { StatusBar } from './ui/StatusBar'
 
-type Screen = 'menu' | 'tarot' | 'spread' | 'diary' | 'natal'
+type Screen = 'menu' | 'tarot' | 'spread' | 'diary' | 'natal' | 'matrix'
 
 /** Сколько тасуется колода перед картой дня, мс; совпадает с .shuffle в styles.css. */
 const SHUFFLE_MS = 1100
@@ -81,6 +82,7 @@ export function App() {
         {screen === 'spread' && <Spread onBack={() => go('tarot')} />}
         {screen === 'diary' && <Diary onBack={() => go('tarot')} />}
         {screen === 'natal' && <NatalScreen onBack={() => go('menu')} />}
+        {screen === 'matrix' && <MatrixScreen onBack={() => go('menu')} />}
         <p className="disclaimer">
           Толкования носят рефлексивный и развлекательный характер и не заменяют советы врача, юриста или психолога.
         </p>
