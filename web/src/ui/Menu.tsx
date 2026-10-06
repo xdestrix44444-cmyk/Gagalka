@@ -8,7 +8,7 @@ export type Door = 'tarot' | 'natal' | 'matrix'
 /** Сколько длится «провал» в выбранную дверь, мс; совпадает с .door.dive в styles.css. */
 const DIVE_MS = 650
 
-/** Меню входа: три двери — таро, натальная карта и матрица судьбы. Выбранная дверь затягивает экран внутрь. */
+/** Меню входа: три двери строками — таро, натальная карта и матрица судьбы. Выбранная дверь затягивает экран внутрь. */
 export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Door) => void }) {
   const [diving, setDiving] = useState<Door | null>(null)
 
@@ -35,11 +35,9 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
       </div>
       <p className="lede">Выберите, за какую нить потянуть.</p>
 
-      {/* нить: спускается от названия и расходится к трём дверям */}
+      {/* нить: спускается от названия к дверям */}
       <svg className="thread" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M100 0 V14 Q100 22 33 26 V40" />
         <path d="M100 0 V40" />
-        <path d="M100 0 V14 Q100 22 167 26 V40" />
       </svg>
 
       <div className="doors">
@@ -49,8 +47,8 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
               <span key={i} className={`fan-card f${i}`} style={{ backgroundImage: `url(${backImg})` }} />
             ))}
           </span>
-          <span className="door-name">Таро<br />&nbsp;</span>
-          <span className="door-sub">карта дня · расклады · дневник</span>
+          <span className="door-name">Таро</span>
+          <span className="door-sub">колода помнит</span>
         </button>
 
         <button type="button" className={`door natal${diving === 'natal' ? ' dive' : ''}`} onClick={() => enter('natal')} onPointerEnter={() => play('type')}>
@@ -85,8 +83,8 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
               <circle className="mw-core" cx="60" cy="60" r="2.5" />
             </svg>
           </span>
-          <span className="door-name">Натальная<br />карта</span>
-          <span className="door-sub">небо в момент рождения</span>
+          <span className="door-name">Натальная карта</span>
+          <span className="door-sub">небо вашего часа</span>
         </button>
 
         <button type="button" className={`door matrix${diving === 'matrix' ? ' dive' : ''}`} onClick={() => enter('matrix')} onPointerEnter={() => play('type')}>
@@ -106,8 +104,8 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
               <circle className="mm-core" cx="60" cy="60" r="7" />
             </svg>
           </span>
-          <span className="door-name">Матрица<br />судьбы</span>
-          <span className="door-sub">22 аркана из даты</span>
+          <span className="door-name">Матрица судьбы</span>
+          <span className="door-sub">числа, что вас ждали</span>
         </button>
       </div>
     </section>
