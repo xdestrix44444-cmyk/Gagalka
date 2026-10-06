@@ -23,6 +23,11 @@ export function hasArt(id: number) {
   return id in ART
 }
 
+/** Исходный рисунок карты для миниатюр (без рамки и обработки), если он есть. */
+export function artOf(id: number): string | undefined {
+  return ART[id]
+}
+
 const images = new Map<string, Promise<HTMLImageElement>>()
 
 function loadImage(src: string) {

@@ -3,6 +3,7 @@ import { DECK } from '../deck'
 import { fmtDate } from '../natal/NatalScreen'
 import { loadPeople, savePerson, type Person } from '../natal/people'
 import { PixelCard } from '../PixelCard'
+import { artOf } from '../sprites'
 import { play } from '../sound'
 import { ScreenHead } from '../ui/ScreenHead'
 import { baseOf, coupleMatrix, deckId, matrixOf, reduce, type Matrix } from './calc'
@@ -46,7 +47,7 @@ export function MatrixScreen({ onBack }: { onBack: () => void }) {
                   setView({ kind: 'person', person: p })
                 }}
               >
-                <span className="m-badge" aria-hidden="true">{e}</span>
+                <Thumb a={e} />
                 <span className="person-name">
                   {p.name}
                   {p.self && <span className="self"> · это вы</span>}
@@ -122,6 +123,17 @@ function MatrixForm({ firstSelf, onSave, onCancel }: { firstSelf: boolean; onSav
         </div>
       </form>
     </section>
+  )
+}
+
+/** Миниатюра аркана: исходный рисунок колоды и номер аркана матрицы в углу. */
+function Thumb({ a, on }: { a: number; on?: boolean }) {
+  const src = artOf(deckId(a))
+  return (
+    <span className={on ? 'm-thumb on' : 'm-thumb'} aria-hidden="true">
+      {src && <img src={src} alt="" />}
+      <b>{a}</b>
+    </span>
   )
 }
 
@@ -274,7 +286,7 @@ function Sections({ m, sections, sel, onSel, couple }: { m: Matrix; sections: Se
             const info = POINTS[k]!
             return (
               <button key={k} type="button" className={sel === k ? 'm-row on' : 'm-row'} onClick={() => onSel(k)}>
-                <span className="m-row-num">{a}</span>
+                <Thumb a={a} on={sel === k} />
                 <span className="m-row-body">
                   <span className="m-row-title">
                     {couple ? (COUPLE_TITLE[k] ?? info.title) : info.title} · <b>{ARCANA[a].name}</b>
