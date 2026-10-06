@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { ScreenHead } from '../ui/ScreenHead'
 import { play } from '../sound'
 import { ASPECTS, PLANETS, SIGNS_GEN, type PlanetKey } from './chart'
 import { planetEmblem, signEmblem } from './emblems'
@@ -51,11 +52,7 @@ export function SynastryView({ people, onBack }: { people: Person[]; onBack: () 
 
   return (
     <section className="screen">
-      <h1 className="title">
-        <span className="gem" aria-hidden="true" />
-        Совместимость
-        <span className="gem" aria-hidden="true" />
-      </h1>
+      <ScreenHead title="Совместимость" onBack={onBack} />
       <div className="pair">
         <PersonPick people={people} value={aId} other={bId} onChange={(id) => (setAId(id), setSel({}))} label="снаружи" />
         <button type="button" className="swap" onClick={swap} aria-label="Поменять местами">
@@ -114,12 +111,6 @@ export function SynastryView({ people, onBack }: { people: Person[]; onBack: () 
           </article>
         ))}
         {(!A.time || !B.time) && <p className="hint-small">Если у кого-то неизвестно время рождения, положение Луны примерное — учитывайте это в разделе «солнце и луна».</p>}
-      </div>
-      <div className="divider" aria-hidden="true" />
-      <div className="actions">
-        <button type="button" className="btn wide" onClick={onBack}>
-          К списку
-        </button>
       </div>
     </section>
   )

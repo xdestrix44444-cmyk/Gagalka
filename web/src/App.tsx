@@ -13,6 +13,7 @@ import { haptic, initTelegram } from './telegram'
 import { Boot, shouldBoot } from './ui/Boot'
 import { Haunt } from './ui/Haunt'
 import { Menu } from './ui/Menu'
+import { ScreenHead } from './ui/ScreenHead'
 import { StatusBar } from './ui/StatusBar'
 
 type Screen = 'menu' | 'tarot' | 'spread' | 'diary' | 'natal'
@@ -48,8 +49,18 @@ function lastCardId(): number | null {
 export function App() {
   const [screen, setScreen] = useState<Screen>('menu')
   const [booting, setBooting] = useState(shouldBoot)
+  // смена раздела: старый экран гаснет, новый проявляется (screen-out / screen-in в styles.css)
+  const [leaving, setLeaving] = useState(false)
   const go = (s: Screen) => {
     play('tap')
+    if (prefersReducedMotion()) return show(s)
+    setLeaving(true)
+    setTimeout(() => {
+      setLeaving(false)
+      show(s)
+    }, 180)
+  }
+  const show = (s: Screen) => {
     setScreen(s)
     window.scrollTo({ top: 0 })
   }
@@ -57,15 +68,13 @@ export function App() {
     <>
       <Haunt />
       {/* звук можно запустить только после жеста: первое касание возобновляет гул, если он включён */}
-      <main className="app" onPointerDown={resumeSound}>
-        <StatusBar onHome={() => setScreen('menu')} />
+      <main className={leaving ? 'app leaving' : 'app'} onPointerDown={resumeSound}>
+        <div key={screen} className="sweep" aria-hidden="true" />
+        <StatusBar onHome={() => go('menu')} />
         {screen === 'menu' && (
           <Menu
             greeting={tg.firstName ? `с возвращением, ${tg.firstName}` : 'пользователь опознан'}
-            onEnter={(d) => {
-              setScreen(d)
-              window.scrollTo({ top: 0 })
-            }}
+            onEnter={show}
           />
         )}
         {screen === 'tarot' && <Tarot onSpread={() => go('spread')} onDiary={() => go('diary')} onMenu={() => go('menu')} />}
@@ -83,16 +92,6 @@ export function App() {
 }
 
 /** Заголовок экрана с пиксельными ромбами по краям. */
-function Title({ children }: { children: string }) {
-  return (
-    <h1 className="title">
-      <span className="gem" aria-hidden="true" />
-      {children}
-      <span className="gem" aria-hidden="true" />
-    </h1>
-  )
-}
-
 /** Раздел таро: карта дня, вход в расклад и дневник. */
 function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: () => void; onMenu: () => void }) {
   const today = useMemo(() => dayKey(), [])
@@ -130,8 +129,8 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
   const card = cardId === null ? null : DECK[cardId]
   return (
     <section className="screen">
-      <Title>Карта дня</Title>
-      <p className="lede">Подумайте о том, что сегодня для вас важно, и коснитесь карты.</p>
+      <ScreenHead title="Карта дня" onBack={onMenu} />
+      {!card && <p className="lede">Подумайте о том, что сегодня для вас важно, и откройте карту.</p>}
       <div className="stage single altar">
         {shuffling ? (
           <ShuffleDeck />
@@ -158,18 +157,22 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
             }
           />
         )}
-        {!card && <p className="hint">{shuffling ? 'тасую колоду…' : 'коснитесь нити'}</p>}
+        {!card &&
+          (shuffling ? (
+            <p className="hint">тасую колоду…</p>
+          ) : (
+            <button type="button" className="btn primary cta" onClick={reveal}>
+              Открыть карту дня
+            </button>
+          ))}
       </div>
       <div className="divider" aria-hidden="true" />
       <div className="actions">
-        <button type="button" className="btn primary" onClick={onSpread}>
-          Три карты
+        <button type="button" className={card ? 'btn primary wide' : 'btn'} onClick={onSpread}>
+          {card ? 'Расклад на три карты' : 'Три карты'}
         </button>
-        <button type="button" className="btn" onClick={onDiary}>
+        <button type="button" className={card ? 'btn wide' : 'btn'} onClick={onDiary}>
           Дневник
-        </button>
-        <button type="button" className="btn wide" onClick={onMenu}>
-          В меню
         </button>
       </div>
     </section>
@@ -195,6 +198,8 @@ function Spread({ onBack }: { onBack: () => void }) {
   const omens = dealt.omens
   const [open, setOpen] = useState<boolean[]>([false, false, false])
   const allOpen = open.every(Boolean)
+  // карты открываются по порядку: ситуация, препятствие, совет
+  const next = open.indexOf(false)
   const started = open.some(Boolean)
   const [question, setQuestion] = useState('')
 
@@ -222,8 +227,8 @@ function Spread({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="screen">
-      <Title>Три карты</Title>
-      <p className="lede">Задайте вопрос или просто подумайте о нём, затем открывайте карты по порядку.</p>
+      <ScreenHead title="Три карты" onBack={onBack} />
+      {!started && <p className="lede">Задайте вопрос или просто подумайте о нём, затем откройте карты по порядку.</p>}
       {started ? (
         question.trim() && <p className="asked">«{question.trim()}»</p>
       ) : (
@@ -234,16 +239,16 @@ function Spread({ onBack }: { onBack: () => void }) {
       )}
       <div className="stage three">
         {cards.map((c, i) => (
-          <figure key={`${round}-${i}`} className="slot deal" style={{ '--i': i } as CSSProperties}>
+          <figure key={`${round}-${i}`} className={`slot deal${i === next ? ' next' : ''}${!open[i] && i !== next ? ' wait' : ''}`} style={{ '--i': i } as CSSProperties}>
             <PixelCard
               id={open[i] ? c.id : null}
               integrity={integrity[i]}
               label={open[i] ? `${THREE_CARD_POSITIONS[i]}: ${c.name}, целостность ${integrity[i]}%` : `${THREE_CARD_POSITIONS[i]}, рубашка. Нажмите, чтобы открыть`}
-              onClick={open[i] ? undefined : () => flip(i)}
+              onClick={i === next ? () => flip(i) : undefined}
             />
             <figcaption>
               <span className="pos">{THREE_CARD_POSITIONS[i]}</span>
-              {open[i] && <span className="nm">{c.name}</span>}
+              {open[i] ? <span className="nm">{c.name}</span> : i === next && <span className="tap">▸ коснитесь</span>}
             </figcaption>
           </figure>
         ))}
@@ -268,17 +273,16 @@ function Spread({ onBack }: { onBack: () => void }) {
           </article>
         )}
       </div>
-      <div className="divider" aria-hidden="true" />
-      <div className="actions">
-        {allOpen && (
-          <button type="button" className="btn primary" onClick={again}>
-            Новый расклад
-          </button>
-        )}
-        <button type="button" className="btn" onClick={onBack}>
-          Назад
-        </button>
-      </div>
+      {allOpen && (
+        <>
+          <div className="divider" aria-hidden="true" />
+          <div className="actions">
+            <button type="button" className="btn primary wide" onClick={again}>
+              Новый расклад
+            </button>
+          </div>
+        </>
+      )}
     </section>
   )
 }
@@ -288,7 +292,7 @@ function Diary({ onBack }: { onBack: () => void }) {
   const fmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
   return (
     <section className="screen">
-      <Title>Дневник</Title>
+      <ScreenHead title="Дневник" onBack={onBack} />
       {history.length === 0 ? (
         <p className="lede">Здесь появятся ваши расклады. Откройте карту дня или сделайте первый расклад.</p>
       ) : (
@@ -315,12 +319,6 @@ function Diary({ onBack }: { onBack: () => void }) {
           ))}
         </ul>
       )}
-      <div className="divider" aria-hidden="true" />
-      <div className="actions">
-        <button type="button" className="btn" onClick={onBack}>
-          Назад
-        </button>
-      </div>
     </section>
   )
 }

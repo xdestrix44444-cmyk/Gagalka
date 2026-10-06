@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { DECK } from '../deck'
 import { PixelCard } from '../PixelCard'
 import { hasArt } from '../sprites'
+import { ScreenHead } from '../ui/ScreenHead'
 import { play } from '../sound'
 import { ASPECTS, PERIODS, PLANETS, POINTS, SIGNS, SIGNS_GEN, birthArcana, possibleAscendants, type Chart, type DayPeriod, type Element, type PlanetKey, type PointKey } from './chart'
 import { findCities, type City } from './cities'
@@ -60,11 +61,7 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="screen">
-      <h1 className="title">
-        <span className="gem" aria-hidden="true" />
-        Натальные карты
-        <span className="gem" aria-hidden="true" />
-      </h1>
+      <ScreenHead title="Натальные карты" onBack={onBack} />
       <p className="lede">Карта неба в момент рождения. Своя и тех, кто рядом.</p>
       <ul className="people">
         {people.map((p) => (
@@ -92,11 +89,8 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
       </ul>
       <div className="divider" aria-hidden="true" />
       <div className="actions">
-        <button type="button" className="btn primary" onClick={() => setView({ kind: 'form' })}>
+        <button type="button" className="btn primary wide" onClick={() => setView({ kind: 'form' })}>
           Новая карта
-        </button>
-        <button type="button" className="btn" onClick={onBack}>
-          Назад
         </button>
         {people.length >= 2 && (
           <button
@@ -140,11 +134,7 @@ function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: Person; 
 
   return (
     <section className="screen">
-      <h1 className="title">
-        <span className="gem" aria-hidden="true" />
-        {person ? 'Изменить данные' : 'Новая карта'}
-        <span className="gem" aria-hidden="true" />
-      </h1>
+      <ScreenHead title={person ? 'Изменить данные' : 'Новая карта'} onBack={onCancel} />
       <p className="lede">Чем точнее время рождения, тем точнее Асцендент и дома.</p>
       <form className="natal-form" onSubmit={submit} noValidate>
         <label>
@@ -215,11 +205,8 @@ function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: Person; 
         </label>
         {error && <p className="form-error">&gt; {error}</p>}
         <div className="actions">
-          <button type="submit" className="btn primary">
-            Построить
-          </button>
-          <button type="button" className="btn" onClick={onCancel}>
-            Отмена
+          <button type="submit" className="btn primary wide">
+            Построить карту
           </button>
         </div>
       </form>
@@ -355,11 +342,7 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
 
   return (
     <section className="screen">
-      <h1 className="title">
-        <span className="gem" aria-hidden="true" />
-        {person.name}
-        <span className="gem" aria-hidden="true" />
-      </h1>
+      <ScreenHead title={person.name} onBack={onBack} />
       <p className="lede">
         {fmtDate(person.date)}
         {person.time ? `, ${person.time}` : person.period ? `, ${PERIODS.find((x) => x.key === person.period)!.name}` : ', время неизвестно'} · {person.city}
@@ -564,23 +547,20 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
         </div>
       )}
       <div className="divider" aria-hidden="true" />
-      <div className="actions three-btn">
-        <button type="button" className="btn" onClick={onEdit}>
-          Изменить
-        </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => {
-            if (window.confirm(`Удалить карту «${person.name}»?`)) onDelete()
-          }}
-        >
-          Удалить
-        </button>
-        <button type="button" className="btn primary" onClick={onBack}>
-          К списку
+      <div className="actions">
+        <button type="button" className="btn wide" onClick={onEdit}>
+          Изменить данные
         </button>
       </div>
+      <button
+        type="button"
+        className="link-danger"
+        onClick={() => {
+          if (window.confirm(`Удалить карту «${person.name}»?`)) onDelete()
+        }}
+      >
+        удалить карту
+      </button>
     </section>
   )
 }
