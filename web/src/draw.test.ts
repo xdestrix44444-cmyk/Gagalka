@@ -76,9 +76,10 @@ describe('целостность карт', () => {
 })
 
 describe('толкование по целостности', () => {
-  it('у каждой карты в игре есть помеха и тень', async () => {
+  it('у каждой из 78 карт есть помеха и тень', async () => {
     const { LAYERS } = await import('./layers')
-    for (const c of ACTIVE_DECK) {
+    expect(DECK).toHaveLength(78)
+    for (const c of DECK) {
       expect(LAYERS[c.id]?.noise.length).toBeGreaterThan(40)
       expect(LAYERS[c.id]?.shadow.log).toHaveLength(2)
       expect(LAYERS[c.id]?.shadow.text.length).toBeGreaterThan(40)
