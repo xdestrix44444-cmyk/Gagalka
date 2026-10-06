@@ -1,7 +1,7 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { DECK } from '../deck'
-import { PersonForm, fmtDate } from '../natal/NatalScreen'
-import { loadPeople, type Person } from '../natal/people'
+import { fmtDate } from '../natal/NatalScreen'
+import { loadPeople, savePerson, type Person } from '../natal/people'
 import { PixelCard } from '../PixelCard'
 import { play } from '../sound'
 import { ScreenHead } from '../ui/ScreenHead'
@@ -17,7 +17,7 @@ export function MatrixScreen({ onBack }: { onBack: () => void }) {
 
   if (view.kind === 'form')
     return (
-      <PersonForm
+      <MatrixForm
         firstSelf={!people.some((p) => p.self)}
         onSave={(p) => {
           setPeople(loadPeople())
@@ -77,6 +77,50 @@ export function MatrixScreen({ onBack }: { onBack: () => void }) {
           </button>
         )}
       </div>
+    </section>
+  )
+}
+
+/** Форма матрицы: только имя и дата. Место и время рождения допишут, если захотят натальную карту. */
+function MatrixForm({ firstSelf, onSave, onCancel }: { firstSelf: boolean; onSave: (p: Person) => void; onCancel: () => void }) {
+  const [name, setName] = useState('')
+  const [date, setDate] = useState('')
+  const [self, setSelf] = useState(firstSelf)
+  const [error, setError] = useState('')
+  const today = new Date().toISOString().slice(0, 10)
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return setError('Как зовут человека?')
+    if (!date || date < '1900-01-01' || date > today) return setError('Укажите дату рождения')
+    play('tap')
+    onSave(savePerson({ name: name.trim(), date, time: null, city: '', region: '', self }))
+  }
+
+  return (
+    <section className="screen">
+      <ScreenHead title="Новая матрица" onBack={onCancel} />
+      <p className="lede">Для матрицы судьбы нужна только дата рождения.</p>
+      <form className="natal-form" onSubmit={submit} noValidate>
+        <label>
+          <span><span className="prompt">&gt;</span> имя</span>
+          <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="Как подписать матрицу" />
+        </label>
+        <label>
+          <span><span className="prompt">&gt;</span> дата рождения</span>
+          <input type="date" value={date} min="1900-01-01" max={today} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={self} onChange={(e) => setSelf(e.target.checked)} />
+          <span>это моя матрица</span>
+        </label>
+        {error && <p className="form-error">&gt; {error}</p>}
+        <div className="actions">
+          <button type="submit" className="btn primary wide">
+            Рассчитать матрицу
+          </button>
+        </div>
+      </form>
     </section>
   )
 }

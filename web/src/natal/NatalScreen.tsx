@@ -7,7 +7,7 @@ import { play } from '../sound'
 import { ASPECTS, PERIODS, PLANETS, POINTS, SIGNS, SIGNS_GEN, birthArcana, possibleAscendants, type Chart, type DayPeriod, type Element, type PlanetKey, type PointKey } from './chart'
 import { findCities, type City } from './cities'
 import { planetEmblem, signEmblem } from './emblems'
-import { chartOf, cityOf, deletePerson, loadPeople, savePerson, type Person } from './people'
+import { chartOf, cityOf, deletePerson, hasBirthplace, loadPeople, savePerson, type Person } from './people'
 import { skyToday } from './relations'
 import { renderShare, shareImage } from './share'
 import { SynastryView } from './Synastry'
@@ -44,7 +44,9 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
         onCancel={() => (people.length ? setView({ kind: 'list' }) : onBack())}
       />
     )
-  if (view.kind === 'synastry') return <SynastryView people={people} onBack={() => setView({ kind: 'list' })} />
+  // совместимость и натальный круг — только для людей с местом рождения
+  const complete = people.filter(hasBirthplace)
+  if (view.kind === 'synastry') return <SynastryView people={complete} onBack={() => setView({ kind: 'list' })} />
   if (view.kind === 'chart')
     return (
       <NatalChart
@@ -71,7 +73,7 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
               className="person"
               onClick={() => {
                 play('tap')
-                setView({ kind: 'chart', person: p })
+                setView(hasBirthplace(p) ? { kind: 'chart', person: p } : { kind: 'form', person: p })
               }}
             >
               <img className="person-sign" src={signEmblem(sunSign(p))} alt="" />
@@ -81,7 +83,13 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
               </span>
               <span className="person-meta">
                 {fmtDate(p.date)}
-                {p.time ? `, ${p.time}` : p.period ? `, ${PERIODS.find((x) => x.key === p.period)!.name.split(' ')[0]}` : ''} · {p.city}
+                {hasBirthplace(p) ? (
+                  <>
+                    {p.time ? `, ${p.time}` : p.period ? `, ${PERIODS.find((x) => x.key === p.period)!.name.split(' ')[0]}` : ''} · {p.city}
+                  </>
+                ) : (
+                  <span className="need"> · нужно место рождения</span>
+                )}
               </span>
             </button>
           </li>
@@ -92,7 +100,7 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
         <button type="button" className="btn primary wide" onClick={() => setView({ kind: 'form' })}>
           Новая карта
         </button>
-        {people.length >= 2 && (
+        {complete.length >= 2 && (
           <button
             type="button"
             className="btn wide"
@@ -113,7 +121,9 @@ export function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: P
   const [name, setName] = useState(person?.name ?? '')
   const [date, setDate] = useState(person?.date ?? '')
   const [time, setTime] = useState(person?.time ?? '')
-  const [noTime, setNoTime] = useState(person ? person.time === null : false)
+  // человек из матрицы судьбы: есть только имя и дата, время ещё не спрашивали
+  const incomplete = !!person && !cityOf(person)
+  const [noTime, setNoTime] = useState(person && !incomplete ? person.time === null : false)
   const [period, setPeriod] = useState<DayPeriod | undefined>(person?.period)
   const [query, setQuery] = useState(person?.city ?? '')
   const [city, setCity] = useState<City | undefined>(person ? cityOf(person) : undefined)
@@ -134,8 +144,8 @@ export function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: P
 
   return (
     <section className="screen">
-      <ScreenHead title={person ? 'Изменить данные' : 'Новая карта'} onBack={onCancel} />
-      <p className="lede">Чем точнее время рождения, тем точнее Асцендент и дома.</p>
+      <ScreenHead title={incomplete ? 'Дополнить данные' : person ? 'Изменить данные' : 'Новая карта'} onBack={onCancel} />
+      <p className="lede">{incomplete ? 'Для натальной карты нужно место рождения и, если знаете, время. Имя и дата уже есть.' : 'Чем точнее время рождения, тем точнее Асцендент и дома.'}</p>
       <form className="natal-form" onSubmit={submit} noValidate>
         <label>
           <span><span className="prompt">&gt;</span> имя</span>

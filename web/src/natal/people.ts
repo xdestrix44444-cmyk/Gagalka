@@ -12,6 +12,7 @@ export interface Person {
   time: string | null
   /** Если точного времени нет: примерная часть суток. */
   period?: DayPeriod
+  /** Город и регион рождения; пустые, если человека добавили из матрицы судьбы. */
   city: string
   region: string
   self: boolean
@@ -52,6 +53,11 @@ export function deletePerson(id: string) {
 
 export function cityOf(p: Person): City | undefined {
   return CITIES.find((c) => c.name === p.city && c.region === p.region)
+}
+
+/** Есть ли место рождения. Человека, добавленного из матрицы судьбы (только имя и дата), для натальной карты надо дополнить. */
+export function hasBirthplace(p: Person): boolean {
+  return !!cityOf(p)
 }
 
 /** Карта человека: с домами — только при точном времени; без него — на середину части суток или полдень. */

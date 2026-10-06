@@ -282,6 +282,7 @@ button.pcard-wrap .pcard-flip:not(.flipped) { animation: breathe 2.4s steps(6, e
 .person-name { font-family: var(--pix); font-size: var(--px-s); line-height: 1.8; }
 .person-name .self { color: var(--teal); }
 .person-meta { font-size: var(--fs-meta); color: var(--muted); }
+.person-meta .need { color: var(--warn); }
 .natal-form { display: grid; gap: 12px; }
 .natal-form label { display: grid; gap: 4px; font-size: var(--fs-ui); color: var(--muted); position: relative; }
 .natal-form input:not([type=checkbox]) { font: inherit; font-family: var(--mono); font-size: 1rem; color: var(--fg); padding: 4px 6px; border-radius: 0; caret-color: var(--teal); color-scheme: dark;
