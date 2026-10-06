@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { rollIntegrity } from './creep'
+import { omensFor, rollIntegrity, type Omen } from './creep'
 import { AiText } from './AiText'
 import { DECK, integrityState } from './deck'
 import { THREE_CARD_POSITIONS, cryptoRng, dayKey, drawCards } from './draw'
@@ -24,9 +24,10 @@ const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion:
 
 const tg = initTelegram()
 
-/** Целостность карты в этот раз; предыдущей считается последняя карта дневника. */
-function rollFor(cardId: number, previousCardId: number | null): number {
-  return rollIntegrity({ date: new Date(), previousCardId, cardId }, cryptoRng)
+/** Целостность карты в этот раз и знамения, которые на неё влияли; предыдущей считается последняя карта дневника. */
+function rollFor(cardId: number, previousCardId: number | null): { integrity: number; omens: Omen[] } {
+  const ctx = { date: new Date(), previousCardId, cardId }
+  return { integrity: rollIntegrity(ctx, cryptoRng), omens: omensFor(ctx) }
 }
 
 /** Звук и вибрация в момент, когда открылась карта: повреждённая сбоит, с помехой шипит. */
@@ -117,9 +118,9 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
 
   const pick = () => {
     const [card] = drawCards(1)
-    const integrity = rollFor(card.id, lastCardId())
+    const { integrity, omens } = rollFor(card.id, lastCardId())
     revealFx(integrity)
-    const entry = { cardId: card.id, integrity }
+    const entry = { cardId: card.id, integrity, omens }
     saveDayCard(today, entry)
     saveHistoryEntry({ kind: 'day', cards: [card.id], integrity: [integrity] })
     setDay(entry)
@@ -141,10 +142,11 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
           <Reading
             card={card}
             integrity={day.integrity}
+            omens={day.omens}
             delay={justRevealed ? FLIP_MS : 0}
             body={
               <AiText
-                request={{ kind: 'day', cards: [{ id: card.id, integrity: day.integrity }] }}
+                request={{ kind: 'day', cards: [{ id: card.id, integrity: day.integrity, omens: day.omens }] }}
                 saved={day.ai}
                 fallback={<ReadingText card={card} integrity={day.integrity} />}
                 onDone={(ai) => {
@@ -178,18 +180,19 @@ function Spread({ onBack }: { onBack: () => void }) {
   const deal = () => {
     const drawn = drawCards(3)
     let prev = lastCardId()
-    const integrity = drawn.map((c) => {
+    const rolls = drawn.map((c) => {
       const v = rollFor(c.id, prev)
       prev = c.id
       return v
     })
-    return { drawn, integrity }
+    return { drawn, integrity: rolls.map((r) => r.integrity), omens: rolls.map((r) => r.omens) }
   }
   const [dealt, setDealt] = useState(deal)
   // номер раздачи: новые карты всегда заново вылетают из колоды
   const [round, setRound] = useState(0)
   const cards = dealt.drawn
   const integrity = dealt.integrity
+  const omens = dealt.omens
   const [open, setOpen] = useState<boolean[]>([false, false, false])
   const allOpen = open.every(Boolean)
   const started = open.some(Boolean)
@@ -249,14 +252,14 @@ function Spread({ onBack }: { onBack: () => void }) {
         {cards.map(
           (c, i) =>
             open[i] && (
-              <Reading key={`${round}-${i}`} card={c} integrity={integrity[i]} position={THREE_CARD_POSITIONS[i]} delay={FLIP_MS} body={null} />
+              <Reading key={`${round}-${i}`} card={c} integrity={integrity[i]} omens={omens[i]} position={THREE_CARD_POSITIONS[i]} delay={FLIP_MS} body={null} />
             ),
         )}
         {allOpen && (
           <article key={round} className="reading summary">
             <h2>&gt; толкование расклада</h2>
             <AiText
-              request={{ kind: 'three', cards: cards.map((c, i) => ({ id: c.id, integrity: integrity[i] })), question: question.trim() || undefined }}
+              request={{ kind: 'three', cards: cards.map((c, i) => ({ id: c.id, integrity: integrity[i], omens: omens[i] })), question: question.trim() || undefined }}
               delay={FLIP_MS + 1400}
               fallback={cards.map((c, i) => (
                 <ReadingText key={i} card={c} integrity={integrity[i]} label={THREE_CARD_POSITIONS[i]} />

@@ -1,5 +1,6 @@
 // Промпт ИИ-таролога «Нить». Системная часть неизменна (кэшируется), карты и вопрос идут в сообщение.
 
+import { OMENS, type Omen } from '../src/creep'
 import { DECK, INTEGRITY_LABEL, readingOf } from '../src/deck'
 import { THREE_CARD_POSITIONS } from '../src/draw'
 import type { ReadingRequest } from '../src/reading-request'
@@ -11,6 +12,7 @@ export const SYSTEM_PROMPT = `Ты — «Нить», голос нейро-та�
 - Если в раскладе несколько карт, читай их вместе: как одна карта влияет на другую, что из этого складывается. Общая история важнее перечисления.
 - Если есть вопрос, отвечай на него через карты. Если вопрос неясный, всё равно дай толкование и в конце предложи, как его уточнить.
 - У каждой карты есть целостность — насколько ясно она читается в этот раз. ЦЕЛ (90–100%): прямое значение. ЧАСТИЧНО (60–89%): прямое значение, но что-то мешает ему проявиться — назови эту помеху. ПОВРЕЖДЁН (меньше 60%): карта легла перевёрнутой, читай её теневое, перевёрнутое значение; чем ниже процент, тем сильнее тень. Тон у повреждённой карты серьёзнее и внимательнее, но без запугивания: что стоит перепроверить и как подстраховаться. Сам процент упоминать не обязательно.
+- Знамения (ночь, фазы луны, ретроградный Меркурий, повтор карты, пятница 13-е) — то, что в этот раз повысило риск сбоя. Можно коротко обыграть одно, если оно к месту, но не строй на них толкование и не пугай ими.
 - Говори о внутреннем: выборе, чувствах, отношении к ситуации, следующем шаге. Карты дают взгляд со стороны и повод подумать, а не предсказание судьбы.
 - Обращайся на «вы». Пиши тепло, просто и конкретно, без пафоса и эзотерических штампов. Можно изредка использовать образы колоды: файл, лог, сбой, восстановление.
 
@@ -29,12 +31,13 @@ export const SYSTEM_PROMPT = `Ты — «Нить», голос нейро-та�
 - Закончи одной конкретной мыслью или маленьким действием на сегодня.
 - Человек ждёт ответ на экране: начинай толкование сразу, без вступлений.`
 
-function describeCard(id: number, integrity: number, position?: string): string {
+function describeCard(id: number, integrity: number, omens: Omen[] | undefined, position?: string): string {
   const card = DECK[id]
   const r = readingOf(card, integrity)
   return [
     `${position ? `Позиция «${position}»: ` : ''}${card.numeral} · ${card.name}${r.reversed ? ' (перевёрнута)' : ''}`,
-    `Файл ${card.file}, целостность ${integrity}% [${INTEGRITY_LABEL[r.state]}], лог: «${r.log[0]}», «${r.log[1]}»`,
+    `Файл ${card.file}, целостность ${integrity}% [${INTEGRITY_LABEL[r.state]}]`,
+    ...(omens?.length ? [`Знамения: ${omens.map((o) => OMENS[o].line).join('; ')}`] : []),
     `Базовое толкование колоды${r.reversed ? ' (тень)' : ''}: ${r.text}`,
     ...(r.noise ? [r.noise] : []),
   ].join('\n')
@@ -42,8 +45,8 @@ function describeCard(id: number, integrity: number, position?: string): string 
 
 /** Текст сообщения пользователя для модели. */
 export function buildUserMessage(req: ReadingRequest): string {
-  if (req.kind === 'day') return `Карта дня.\n\n${describeCard(req.cards[0].id, req.cards[0].integrity)}`
-  const cards = req.cards.map((c, i) => describeCard(c.id, c.integrity, THREE_CARD_POSITIONS[i])).join('\n\n')
+  if (req.kind === 'day') return `Карта дня.\n\n${describeCard(req.cards[0].id, req.cards[0].integrity, req.cards[0].omens)}`
+  const cards = req.cards.map((c, i) => describeCard(c.id, c.integrity, c.omens, THREE_CARD_POSITIONS[i])).join('\n\n')
   const question = req.question ? `Вопрос человека: «${req.question}»` : 'Человек задал вопрос про себя и не стал его называть.'
   return `Расклад на три карты: ситуация, препятствие, совет.\n${question}\n\n${cards}`
 }

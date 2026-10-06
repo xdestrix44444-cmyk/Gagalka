@@ -1,6 +1,7 @@
 // Запрос на ИИ-толкование: общий для приложения и сервера (web/server).
 // Карты вытягивает код в приложении; сервер только проверяет, что такие карты есть в игре.
 
+import { OMEN_KEYS, type Omen } from './creep'
 import { ACTIVE_IDS } from './deck'
 import { THREE_CARD_POSITIONS } from './draw'
 
@@ -9,7 +10,7 @@ export const QUESTION_MAX = 300
 export interface ReadingRequest {
   kind: 'day' | 'three'
   /** Карты в порядке позиций: для 'three' — ситуация, препятствие, совет. */
-  cards: { id: number; integrity: number }[]
+  cards: { id: number; integrity: number; omens?: Omen[] }[]
   /** Вопрос человека, только для расклада. */
   question?: string
 }
@@ -23,11 +24,12 @@ export function parseReadingRequest(raw: unknown): ReadingRequest | string {
   if (!Array.isArray(r.cards) || r.cards.length !== want) return `cards: нужно ${want}`
   const cards: ReadingRequest['cards'] = []
   for (const c of r.cards as unknown[]) {
-    const { id, integrity } = (c ?? {}) as Record<string, unknown>
+    const { id, integrity, omens } = (c ?? {}) as Record<string, unknown>
     if (typeof id !== 'number' || !ACTIVE_IDS.includes(id)) return `карта ${String(id)} не в игре`
     if (cards.some((x) => x.id === id)) return 'карты не должны повторяться'
     if (typeof integrity !== 'number' || !Number.isInteger(integrity) || integrity < 0 || integrity > 100) return 'integrity: целое 0–100'
-    cards.push({ id, integrity })
+    if (omens !== undefined && (!Array.isArray(omens) || omens.some((o) => !OMEN_KEYS.includes(o)))) return 'omens: список известных знамений'
+    cards.push(omens === undefined ? { id, integrity } : { id, integrity, omens: [...new Set(omens as Omen[])] })
   }
   let question: string | undefined
   if (r.kind === 'three' && r.question !== undefined) {

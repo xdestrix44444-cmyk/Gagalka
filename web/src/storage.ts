@@ -1,3 +1,5 @@
+import { OMEN_KEYS, type Omen } from './creep'
+
 export interface HistoryEntry {
   id: string
   at: number
@@ -52,16 +54,19 @@ export function saveHistoryEntry(entry: Omit<HistoryEntry, 'id' | 'at'>): Histor
 export interface DayCard {
   cardId: number
   integrity: number
+  /** Знамения в момент вытягивания; у карт до их появления нет. */
+  omens?: Omen[]
   /** ИИ-толкование карты дня: сохраняем, чтобы не запрашивать повторно. */
   ai?: string
 }
 
 export function loadDayCard(day: string): DayCard | null {
-  const saved = read<{ day: string; cardId: number; integrity?: number; corrupt?: boolean; ai?: string } | null>(DAY_KEY, null)
+  const saved = read<{ day: string; cardId: number; integrity?: number; corrupt?: boolean; omens?: unknown; ai?: string } | null>(DAY_KEY, null)
   if (!saved || saved.day !== day) return null
   // карта дня, вытянутая до появления целостности: толкование сохранено, процент восстанавливаем из флага
   const integrity = saved.integrity ?? (saved.corrupt ? LEGACY_DAMAGED : 95)
-  return { cardId: saved.cardId, integrity, ai: saved.ai }
+  const omens = Array.isArray(saved.omens) ? saved.omens.filter((o): o is Omen => OMEN_KEYS.includes(o)) : undefined
+  return { cardId: saved.cardId, integrity, omens, ai: saved.ai }
 }
 
 export function saveDayCard(day: string, card: DayCard) {

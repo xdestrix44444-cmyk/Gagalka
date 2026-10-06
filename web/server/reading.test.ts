@@ -16,8 +16,18 @@ describe('parseReadingRequest', () => {
     expect(typeof parseReadingRequest({ kind: 'day', cards: [{ id: 0, integrity: 50.5 }] })).toBe('string')
   })
 
+  it('принимает только известные знамения и убирает повторы', () => {
+    expect(parseReadingRequest({ kind: 'day', cards: [{ id: 18, integrity: 40, omens: ['fullmoon', 'night', 'night'] }] })).toEqual({
+      kind: 'day',
+      cards: [{ id: 18, integrity: 40, omens: ['fullmoon', 'night'] }],
+      question: undefined,
+    })
+    expect(typeof parseReadingRequest({ kind: 'day', cards: [{ id: 18, integrity: 40, omens: ['комета'] }] })).toBe('string')
+    expect(typeof parseReadingRequest({ kind: 'day', cards: [{ id: 18, integrity: 40, omens: 'night' }] })).toBe('string')
+  })
+
   it('отклоняет карты не из игры, повторы и неверное число карт', () => {
-    expect(typeof parseReadingRequest({ kind: 'day', cards: [{ id: 1 }] })).toBe('string')
+    expect(typeof parseReadingRequest({ kind: 'day', cards: [{ id: 30, integrity: 90 }] })).toBe('string')
     expect(typeof parseReadingRequest({ kind: 'day', cards: [{ id: '0' }] })).toBe('string')
     expect(typeof parseReadingRequest({ kind: 'three', cards: [{ id: 0 }, { id: 0 }, { id: 5 }] })).toBe('string')
     expect(typeof parseReadingRequest({ kind: 'three', cards: [{ id: 0 }] })).toBe('string')
@@ -34,13 +44,15 @@ describe('parseReadingRequest', () => {
 
 describe('промпт', () => {
   it('описывает карты с позициями, целостностью и вопросом', () => {
-    const msg = buildUserMessage({ kind: 'three', cards: [{ id: 0, integrity: 96 }, { id: 16, integrity: 21 }, { id: 23, integrity: 70 }], question: 'менять ли город?' })
+    const msg = buildUserMessage({ kind: 'three', cards: [{ id: 0, integrity: 96 }, { id: 16, integrity: 21, omens: ['fullmoon', 'mercury'] }, { id: 23, integrity: 70 }], question: 'менять ли город?' })
     expect(msg).toContain('«менять ли город?»')
     expect(msg).toContain('Позиция «Ситуация»: 0 · Шут\n')
     expect(msg).toContain('целостность 96% [ЦЕЛ]')
     expect(msg).toContain('XVI · Башня (перевёрнута)')
     expect(msg).toContain('целостность 21% [ПОВРЕЖДЁН]')
-    expect(msg).toContain('обрушение отложено')
+    expect(msg).toContain('Перевёрнутая Башня')
+    expect(msg).toContain('Знамения: полнолуние: сигнал перегрет; Меркурий ретрограден')
+    expect(msg).not.toContain('сектор')
     expect(msg).toContain('Позиция «Совет»: II · Двойка Жезлов')
     expect(msg).toContain('Помеха: план готов')
   })

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { NO_OMENS, OMENS, type Omen } from './creep'
 import { INTEGRITY_LABEL, readingOf, type Arcana } from './deck'
 
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
@@ -8,6 +9,8 @@ interface Props {
   position?: string
   /** Целостность, с которой выпала карта. */
   integrity: number
+  /** Знамения в момент вытягивания; у карт, вытянутых до их появления, не заданы. */
+  omens?: Omen[]
   /** Пауза до первой строки лога, мс (пока карта переворачивается). */
   delay?: number
   /** Тело толкования после лога. По умолчанию временный текст колоды; null — только лог и имя. */
@@ -15,15 +18,14 @@ interface Props {
 }
 
 /** Толкование в виде терминального лога: строки появляются по одной, затем имя карты и текст. */
-export function Reading({ card, position, integrity, delay = 0, body }: Props) {
+export function Reading({ card, position, integrity, omens, delay = 0, body }: Props) {
   const r = readingOf(card, integrity)
   const state = r.state
   const lines = [
     `загрузка ${card.file}${position ? ` · ${position.toLowerCase()}` : ''}`,
     `целостность ${integrity}%`,
+    ...(omens ? (omens.length ? omens.map((o) => `${OMENS[o].line} · риск сбоя ↑`) : [NO_OMENS]) : []),
     ...(r.reversed ? ['карта легла перевёрнутой: читаю тень'] : []),
-    r.log[0],
-    r.log[1],
   ]
   const total = lines.length + 1
   const [shown, setShown] = useState(() => (prefersReducedMotion() ? total : 0))

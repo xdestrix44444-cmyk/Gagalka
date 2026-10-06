@@ -7,17 +7,17 @@ import { AY1, H, Ink, W, frame, melt, toPixels } from './art/ink'
 import { K, presetFromImage } from './art/preset'
 import { DECK } from './deck'
 import backImg from './art/img/back.jpg'
-import foolImg from './art/img/00-fool.jpg'
-import hierophantImg from './art/img/05-hierophant.jpg'
-import towerImg from './art/img/16-tower.jpg'
-import starImg from './art/img/17-star.jpg'
 import wands2Img from './art/img/wands-02.jpg'
 import cups7Img from './art/img/cups-07.jpg'
 
 export { H, W }
 
-/** Рисунки по id карты (см. deck.ts): 23 — двойка жезлов, 42 — семёрка кубков. */
-const ART: Record<number, string> = { 0: foolImg, 5: hierophantImg, 16: towerImg, 17: starImg, 23: wands2Img, 42: cups7Img }
+/** Старшие арканы: файл «NN-имя.jpg», где NN — id карты. */
+const MAJOR_ART = import.meta.glob<string>('./art/img/[0-9][0-9]-*.jpg', { eager: true, import: 'default' })
+
+/** Рисунки по id карты (см. deck.ts): старшие по номеру файла, 23 — двойка жезлов, 42 — семёрка кубков. */
+const ART: Record<number, string> = { 23: wands2Img, 42: cups7Img }
+for (const [path, src] of Object.entries(MAJOR_ART)) ART[Number(path.match(/(\d\d)-[^/]*$/)![1])] = src
 
 export function hasArt(id: number) {
   return id in ART

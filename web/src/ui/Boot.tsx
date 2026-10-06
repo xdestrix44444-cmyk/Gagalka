@@ -5,7 +5,6 @@ import { play, resumeSound } from '../sound'
 
 const KEY = 'nit.booted'
 const LINE_MS = 230
-const EYE_MS = 1100
 
 const LINES = [
   'НИТЬ · терминал нейро-таро v0.13',
@@ -25,7 +24,7 @@ export function shouldBoot(): boolean {
   }
 }
 
-/** Экран входа: загрузочный лог, затем открывается глаз. Касание пропускает. */
+/** Экран входа: загрузочный лог, затем открывается глаз. Дальше — только по касанию (касание раньше тоже входит). */
 export function Boot({ onDone }: { onDone: () => void }) {
   const [shown, setShown] = useState(0)
   const [leaving, setLeaving] = useState(false)
@@ -44,18 +43,15 @@ export function Boot({ onDone }: { onDone: () => void }) {
     play('boot')
   }, [])
 
+  // лог печатается по строке; когда он допечатан, глаз с рубашки открывается (.boot-eye.open в styles.css)
+  // и экран ждёт касания — сам дальше не идёт
   useEffect(() => {
-    if (shown < LINES.length) {
-      const t = setTimeout(() => {
-        play('type')
-        setShown((n) => n + 1)
-      }, LINE_MS)
-      return () => clearTimeout(t)
-    }
-    // лог допечатан: глаз с рубашки открывается (анимация .boot-eye.open в styles.css)
-    const t = setTimeout(finish, EYE_MS + 200)
+    if (shown >= LINES.length) return
+    const t = setTimeout(() => {
+      play('type')
+      setShown((n) => n + 1)
+    }, LINE_MS)
     return () => clearTimeout(t)
-    // finish стабилен по смыслу: вызывается один раз
   }, [shown])
 
   return (
@@ -76,7 +72,7 @@ export function Boot({ onDone }: { onDone: () => void }) {
         {shown < LINES.length && <p><span className="prompt">&gt;</span> <span className="blink">_</span></p>}
       </div>
       <div className={shown >= LINES.length ? 'boot-eye open' : 'boot-eye'} style={{ backgroundImage: `url(${backImg})` }} aria-hidden="true" />
-      <p className="boot-skip">коснитесь, чтобы войти</p>
+      <p className={shown >= LINES.length ? 'boot-skip ready' : 'boot-skip'}>коснитесь, чтобы войти</p>
     </div>
   )
 }

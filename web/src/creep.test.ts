@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BASE_DAMAGE, MAX_DAMAGE, damageChance, isFriday13, isNewMoon, isNight, moonAge, rollIntegrity } from './creep'
+import { BASE_DAMAGE, MAX_DAMAGE, damageChance, isFriday13, isFullMoon, isMercuryRetrograde, isNewMoon, isNight, moonAge, omensFor, rollIntegrity } from './creep'
 import { integrityState } from './deck'
 
 const noon = new Date(2026, 9, 6, 12, 0)
@@ -26,6 +26,27 @@ describe('damageChance', () => {
     expect(damageChance({ ...base, date: f13 })).toBeCloseTo(BASE_DAMAGE * 2)
     const worst = new Date(2026, 10, 13, 23, 0)
     expect(damageChance({ ...base, date: worst, previousCardId: 18 })).toBe(MAX_DAMAGE)
+  })
+})
+
+describe('знамения', () => {
+  it('полнолуние 26 октября 2026 повышает риск сбоя', () => {
+    const full = new Date(2026, 9, 26, 12, 0)
+    expect(isFullMoon(full)).toBe(true)
+    expect(isNewMoon(full)).toBe(false)
+    expect(omensFor({ ...base, date: full })).toContain('fullmoon')
+    expect(damageChance({ ...base, date: full })).toBeGreaterThan(BASE_DAMAGE)
+  })
+
+  it('ретроградный Меркурий: осенью 2026 с конца октября до середины ноября', () => {
+    expect(isMercuryRetrograde(new Date(2026, 10, 1, 12))).toBe(true)
+    expect(isMercuryRetrograde(noon)).toBe(false)
+    expect(isMercuryRetrograde(new Date(2026, 11, 10, 12))).toBe(false)
+  })
+
+  it('в обычный день знамений нет, повтор карты — знамение', () => {
+    expect(omensFor(base)).toEqual([])
+    expect(omensFor({ ...base, previousCardId: 18 })).toEqual(['repeat'])
   })
 })
 

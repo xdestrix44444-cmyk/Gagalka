@@ -37,7 +37,8 @@ describe('dayKey', () => {
 describe('колода', () => {
   it('в игре сейчас только карты с рисунком из «карточек»', async () => {
     const { hasArt } = await import('./sprites')
-    expect(ACTIVE_DECK.map((c) => c.name)).toEqual(['Шут', 'Иерофант', 'Башня', 'Звезда', 'Двойка Жезлов', 'Семёрка Кубков'])
+    expect(ACTIVE_DECK).toHaveLength(24)
+    expect(ACTIVE_DECK.map((c) => c.name)).toContain('Луна')
     for (const c of ACTIVE_DECK) expect(hasArt(c.id)).toBe(true)
   })
 
@@ -66,10 +67,9 @@ describe('целостность карт', () => {
     expect(integrityState(43)).toBe('damaged')
   })
 
-  it('у каждой карты есть файл, две строки лога и текст', () => {
+  it('у каждой карты есть файл и текст', () => {
     for (const c of DECK) {
       expect(c.file).toMatch(/\.EXE$/)
-      expect(c.log).toHaveLength(2)
       expect(c.text.length).toBeGreaterThan(40)
     }
   })
@@ -81,8 +81,7 @@ describe('толкование по целостности', () => {
     expect(DECK).toHaveLength(78)
     for (const c of DECK) {
       expect(LAYERS[c.id]?.noise.length).toBeGreaterThan(40)
-      expect(LAYERS[c.id]?.shadow.log).toHaveLength(2)
-      expect(LAYERS[c.id]?.shadow.text.length).toBeGreaterThan(40)
+      expect(LAYERS[c.id]?.shadow.length).toBeGreaterThan(40)
     }
   })
 
@@ -95,6 +94,6 @@ describe('толкование по целостности', () => {
     const dmg = readingOf(tower, 30)
     expect(dmg).toMatchObject({ state: 'damaged', reversed: true })
     expect(dmg.text).not.toBe(tower.text)
-    expect(dmg.log).toEqual(['обрушение отложено', 'нагрузка на опоры растёт'])
+    expect(dmg.text).toMatch(/^Перевёрнутая Башня/)
   })
 })
