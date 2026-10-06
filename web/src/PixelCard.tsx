@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { integrityState } from './deck'
+import { play } from './sound'
 import { drawCardBack, drawCardFace } from './sprites'
 
 /** Длительность переворота, мс; совпадает с .pcard-inner в styles.css. */
@@ -26,9 +28,12 @@ export function PixelCard({ id, label, integrity = 100, animate = false, onClick
   // открыта ли карта с самого начала: тогда без анимации
   const [instant] = useState(id !== null && !animate)
 
+  // открытую карту можно рассмотреть крупно
+  const [zoom, setZoom] = useState(false)
+  const zoomable = !onClick && id !== null
   // карта то кнопка, то просто картинка (в раскладе нажать можно только следующую):
   // при смене обёртки холсты создаются заново, и их надо перерисовать
-  const clickable = !!onClick
+  const clickable = !!onClick || zoomable
 
   useEffect(() => {
     if (backRef.current) drawCardBack(backRef.current)
@@ -48,11 +53,50 @@ export function PixelCard({ id, label, integrity = 100, animate = false, onClick
       </div>
     </div>
   )
-  if (!onClick) return <div className="pcard-wrap" role="img" aria-label={label}>{card}</div>
+  if (!clickable) return <div className="pcard-wrap" role="img" aria-label={label}>{card}</div>
   return (
-    <button type="button" className="pcard-wrap" onClick={onClick} aria-label={label}>
-      {card}
-    </button>
+    <>
+      <button
+        type="button"
+        className={zoomable ? 'pcard-wrap zoomable' : 'pcard-wrap'}
+        onClick={
+          onClick ??
+          (() => {
+            play('tap')
+            setZoom(true)
+          })
+        }
+        aria-label={zoomable ? `${label}. Рассмотреть крупно` : label}
+      >
+        {card}
+      </button>
+      {zoom && id !== null && <CardZoom id={id} integrity={integrity} label={label} onClose={() => setZoom(false)} />}
+    </>
+  )
+}
+
+/** Карта на весь экран: рисунок в полном разрешении, с теми же повреждениями и переворотом. */
+function CardZoom({ id, integrity, label, onClose }: { id: number; integrity: number; label: string; onClose: () => void }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (ref.current) drawCardFace(ref.current, id, integrity)
+    closeRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [id, integrity])
+
+  const reversed = integrityState(integrity) === 'damaged'
+  return createPortal(
+    <div className="zoom" role="dialog" aria-modal="true" aria-label={label}>
+      <button ref={closeRef} type="button" className="zoom-close" onClick={onClose} aria-label="Закрыть">
+        <canvas ref={ref} className={reversed ? 'zoom-card rev' : 'zoom-card'} aria-hidden="true" />
+        <span className="zoom-hint">коснитесь, чтобы закрыть</span>
+      </button>
+    </div>,
+    document.body,
   )
 }
 

@@ -33,7 +33,7 @@ body { min-height: 100vh; overflow-x: hidden; }
 .haunt { position: fixed; inset: 0; width: 100vw; height: 100vh; image-rendering: pixelated; z-index: 0; pointer-events: none; }
 .crt { position: fixed; inset: 0; z-index: 50; pointer-events: none;
   background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.22) 2px 3px),
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.13) 2px 3px),
     radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.65) 100%);
   animation: crt-flicker 6s steps(1, end) infinite; }
 @keyframes crt-flicker { 0%, 96%, 100% { opacity: 1; } 97% { opacity: .82; } 98% { opacity: 1; } 99% { opacity: .9; } }
@@ -90,7 +90,8 @@ p { margin: 0; }
 .pcard-wrap { all: unset; display: block; width: 100%; cursor: pointer; position: relative; z-index: 1; }
 div.pcard-wrap { cursor: default; }
 .pcard-wrap:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
-.pcard { display: block; width: 100%; aspect-ratio: 2 / 3; image-rendering: pixelated; }
+/* рисунок хранится крупнее, чем показывается: уменьшаем сглаженно, чтобы детали не рассыпались */
+.pcard { display: block; width: 100%; aspect-ratio: 2 / 3; }
 .pcard-flip { filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .8)); }
 .hint { font-family: var(--pix); font-size: var(--px-xs); color: var(--teal); letter-spacing: .1em; animation: blink 1.6s steps(1, end) infinite; }
 
@@ -478,8 +479,19 @@ button.pcard-wrap .pcard-flip:not(.flipped) { animation: breathe 2.4s steps(6, e
   animation: sweep .55s var(--ease-out) both; }
 @keyframes sweep { from { transform: translateY(-20vh); opacity: 1; } 80% { opacity: 1; } to { transform: translateY(105vh); opacity: 0; } }
 
+/* крупный просмотр карты: поверх развёртки, чтобы рисунок было видно целиком */
+button.pcard-wrap.zoomable { cursor: zoom-in; }
+.zoom { position: fixed; inset: 0; z-index: 60; background: rgba(3, 3, 5, .97); display: grid; place-items: center;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)); animation: zoom-in .35s var(--ease-out) both; }
+.zoom-close { all: unset; cursor: zoom-out; display: grid; justify-items: center; gap: 14px; }
+.zoom-close:focus-visible { outline: none; }
+.zoom-card { display: block; height: min(80vh, 150vw); max-width: 92vw; aspect-ratio: 2 / 3; box-shadow: 0 0 0 1px #2a2420, 0 20px 60px rgba(0, 0, 0, .9), 0 0 40px rgba(63, 179, 163, .12); animation: panel-in .42s var(--ease-out) both; }
+.zoom-card.rev { transform: rotate(180deg); }
+.zoom-hint { font-family: var(--pix); font-size: var(--px-xs); color: var(--muted); letter-spacing: .08em; }
+@keyframes zoom-in { from { opacity: 0; } to { opacity: 1; } }
+
 @media (prefers-reduced-motion: reduce) {
-  .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
+  .zoom, .zoom-card, .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
   .wheel { transition: none; }
   .flipped::after, .sweep { display: none; }
 }

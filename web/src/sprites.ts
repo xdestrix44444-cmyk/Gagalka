@@ -109,14 +109,16 @@ export function damage(canvas: HTMLCanvasElement, integrity: number, seed: numbe
   const d = img.data
   const src = new Uint8ClampedArray(d)
   const rnd = seeded(seed)
+  // размеры сдвигов и блоков заданы для карты шириной 320
+  const u = w / 320
   const at = (x: number, y: number) => (y * w + ((x % w) + w) % w) * 4
 
   // сдвинутые полосы: сдвиг строк по горизонтали
   const slices = Math.round(s * s * 14 + s * 3)
   for (let k = 0; k < slices; k++) {
     const y0 = Math.floor(rnd() * h)
-    const sh = 2 + Math.floor(rnd() * (3 + s * 10))
-    const off = Math.round((rnd() - 0.5) * 2 * (4 + s * 30))
+    const sh = Math.round((2 + Math.floor(rnd() * (3 + s * 10))) * u)
+    const off = Math.round((rnd() - 0.5) * 2 * (4 + s * 30) * u)
     for (let y = y0; y < Math.min(h, y0 + sh); y++)
       for (let x = 0; x < w; x++) {
         const t = at(x, y)
@@ -128,7 +130,7 @@ export function damage(canvas: HTMLCanvasElement, integrity: number, seed: numbe
   }
 
   // расслоение каналов: красный уезжает вправо, синий влево
-  const split = Math.round(s * 4)
+  const split = Math.round(s * 4 * u)
   if (split > 0) {
     const cur = new Uint8ClampedArray(d)
     for (let y = 0; y < h; y++)
@@ -142,8 +144,8 @@ export function damage(canvas: HTMLCanvasElement, integrity: number, seed: numbe
   // выпавшие блоки: только у сильно повреждённых карт, и немного — рисунок должен узнаваться
   const blocks = s > 0.6 ? Math.round((s - 0.6) * 25) : 0
   for (let k = 0; k < blocks; k++) {
-    const bw = 8 + Math.floor(rnd() * 40)
-    const bh = 4 + Math.floor(rnd() * 16)
+    const bw = Math.round((8 + Math.floor(rnd() * 40)) * u)
+    const bh = Math.round((4 + Math.floor(rnd() * 16)) * u)
     const x0 = Math.floor(rnd() * (w - bw))
     const y0 = Math.floor(rnd() * (h - bh))
     const mode = rnd()
