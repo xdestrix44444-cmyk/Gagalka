@@ -3,13 +3,14 @@
 
 import { OMEN_KEYS, type Omen } from './creep'
 import { ACTIVE_IDS } from './deck'
-import { THREE_CARD_POSITIONS } from './draw'
+import { SPREADS, isSpreadKind, type SpreadKind } from './spreads'
 
 export const QUESTION_MAX = 300
 
 export interface ReadingRequest {
-  kind: 'day' | 'three'
-  /** Карты в порядке позиций: для 'three' — ситуация, препятствие, совет. */
+  /** Карта дня или один из раскладов (spreads.ts). */
+  kind: 'day' | SpreadKind
+  /** Карты в порядке позиций расклада. */
   cards: { id: number; integrity: number; omens?: Omen[] }[]
   /** Вопрос человека, только для расклада. */
   question?: string
@@ -19,8 +20,8 @@ export interface ReadingRequest {
 export function parseReadingRequest(raw: unknown): ReadingRequest | string {
   if (!raw || typeof raw !== 'object') return 'ожидается объект'
   const r = raw as Record<string, unknown>
-  if (r.kind !== 'day' && r.kind !== 'three') return 'kind: day или three'
-  const want = r.kind === 'day' ? 1 : THREE_CARD_POSITIONS.length
+  if (r.kind !== 'day' && !isSpreadKind(r.kind)) return 'kind: day, one, three или celtic'
+  const want = r.kind === 'day' ? 1 : SPREADS[r.kind].positions.length
   if (!Array.isArray(r.cards) || r.cards.length !== want) return `cards: нужно ${want}`
   const cards: ReadingRequest['cards'] = []
   for (const c of r.cards as unknown[]) {
@@ -32,7 +33,7 @@ export function parseReadingRequest(raw: unknown): ReadingRequest | string {
     cards.push(omens === undefined ? { id, integrity } : { id, integrity, omens: [...new Set(omens as Omen[])] })
   }
   let question: string | undefined
-  if (r.kind === 'three' && r.question !== undefined) {
+  if (r.kind !== 'day' && r.question !== undefined) {
     if (typeof r.question !== 'string') return 'question: строка'
     const q = r.question.trim()
     if (q.length > QUESTION_MAX) return `question: не длиннее ${QUESTION_MAX} символов`

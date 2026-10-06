@@ -42,18 +42,35 @@ describe('parseReadingRequest', () => {
   })
 })
 
+describe('расклады', () => {
+  it('одна карта и кельтский крест: нужное число карт, вопрос разрешён', () => {
+    expect(parseReadingRequest({ kind: 'one', cards: [{ id: 9, integrity: 80 }], question: 'стоит ли?' })).toEqual({ kind: 'one', cards: [{ id: 9, integrity: 80 }], question: 'стоит ли?' })
+    const ten = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((id) => ({ id, integrity: 90 }))
+    expect(typeof parseReadingRequest({ kind: 'celtic', cards: ten })).toBe('object')
+    expect(typeof parseReadingRequest({ kind: 'celtic', cards: ten.slice(0, 3) })).toBe('string')
+    expect(typeof parseReadingRequest({ kind: 'cross', cards: ten })).toBe('string')
+  })
+
+  it('промпт кельтского креста называет позиции и их смысл', () => {
+    const ten = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((id) => ({ id, integrity: 95 }))
+    const msg = buildUserMessage({ kind: 'celtic', cards: ten })
+    expect(msg).toMatch(/^Расклад «Кельтский крест»: суть, помеха/)
+    expect(msg).toContain('Позиция «Итог (куда всё идёт, если ничего не менять)»: IX · Отшельник')
+  })
+})
+
 describe('промпт', () => {
   it('описывает карты с позициями, целостностью и вопросом', () => {
     const msg = buildUserMessage({ kind: 'three', cards: [{ id: 0, integrity: 96 }, { id: 16, integrity: 21, omens: ['fullmoon', 'mercury'] }, { id: 23, integrity: 70 }], question: 'менять ли город?' })
     expect(msg).toContain('«менять ли город?»')
-    expect(msg).toContain('Позиция «Ситуация»: 0 · Шут\n')
+    expect(msg).toContain('Позиция «Ситуация (что происходит сейчас)»: 0 · Шут\n')
     expect(msg).toContain('целостность 96% [ЦЕЛ]')
     expect(msg).toContain('XVI · Башня (перевёрнута)')
     expect(msg).toContain('целостность 21% [ПОВРЕЖДЁН]')
     expect(msg).toContain('Перевёрнутая Башня')
     expect(msg).toContain('Знамения: полнолуние: сигнал перегрет; Меркурий ретрограден')
     expect(msg).not.toContain('сектор')
-    expect(msg).toContain('Позиция «Совет»: II · Двойка Жезлов')
+    expect(msg).toContain('Позиция «Совет (куда смотреть дальше)»: II · Двойка Жезлов')
     expect(msg).toContain('Помеха: план готов')
   })
 

@@ -564,8 +564,66 @@ button.pcard-wrap.zoomable { cursor: zoom-in; }
 .m-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: end; }
 .m-plus { font-family: var(--pix); font-size: var(--px-l); color: var(--teal); padding-bottom: 10px; }
 
+/* выбор расклада: строки с мини-схемой раскладки */
+.spread-pick { display: grid; gap: 10px; }
+.spread-option { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; grid-template-areas: 'icon name count' 'icon line count';
+  column-gap: 14px; row-gap: 2px; align-items: center; padding: 6px 8px 6px 4px;
+  border: 12px solid transparent; border-image: var(--frame-rust) 4 / 12px / 0 stretch; background: var(--panel); background-clip: padding-box; animation: panel-in .42s var(--ease-out) backwards; }
+.spread-option:nth-child(2) { animation-delay: 70ms; }
+.spread-option:nth-child(3) { animation-delay: 140ms; }
+.spread-option:hover, .spread-option:focus-visible { border-image-source: var(--frame-teal); outline: none; }
+.spread-option:hover .spread-name, .spread-option:focus-visible .spread-name { color: var(--teal); }
+.spread-name { grid-area: name; align-self: end; font-family: var(--pix); font-size: var(--px-s); line-height: 1.6; }
+.spread-line { grid-area: line; align-self: start; font-family: var(--serif); font-style: italic; font-size: 1rem; line-height: 1.35; color: var(--muted); }
+.spread-count { grid-area: count; font-family: var(--pix); font-size: var(--px-l); color: var(--rust); }
+/* мини-схема: рубашки, разложенные как в раскладе */
+.spread-icon { grid-area: icon; position: relative; width: 64px; height: 56px; }
+.spread-icon i { position: absolute; width: 12px; height: 18px; border: 1px solid var(--rust); background: #120c0c; }
+.spread-icon.one i { left: 22px; top: 12px; width: 20px; height: 30px; border-color: var(--teal); }
+.spread-icon.three i { top: 16px; width: 16px; height: 24px; }
+.spread-icon.three i:nth-child(1) { left: 4px; }
+.spread-icon.three i:nth-child(2) { left: 24px; }
+.spread-icon.three i:nth-child(3) { left: 44px; }
+.spread-icon.celtic i:nth-child(1) { left: 16px; top: 19px; }
+.spread-icon.celtic i:nth-child(2) { left: 16px; top: 19px; transform: rotate(90deg); border-color: var(--teal); }
+.spread-icon.celtic i:nth-child(3) { left: 16px; top: 38px; }
+.spread-icon.celtic i:nth-child(4) { left: 1px; top: 19px; }
+.spread-icon.celtic i:nth-child(5) { left: 16px; top: 0; }
+.spread-icon.celtic i:nth-child(6) { left: 31px; top: 19px; }
+.spread-icon.celtic i:nth-child(7) { left: 50px; top: 42px; height: 13px; }
+.spread-icon.celtic i:nth-child(8) { left: 50px; top: 28px; height: 13px; }
+.spread-icon.celtic i:nth-child(9) { left: 50px; top: 14px; height: 13px; }
+.spread-icon.celtic i:nth-child(10) { left: 50px; top: 0; height: 13px; }
+
+/* стол на одну карту */
+.stage.spread-one { justify-items: center; }
+.stage.spread-one .slot { width: min(56vw, 220px); }
+/* стол на три карты */
+.stage.spread-three { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+/* кельтский крест: крест 3×3 слева, посох из четырёх карт справа снизу вверх */
+.stage.spread-celtic { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-areas: '. p5 . p10' 'p4 p1 p6 p9' '. p3 . p8' '. . . p7'; gap: 8px 8px; align-items: center; }
+.spread-celtic .slot { gap: 2px; }
+.spread-celtic .slot figcaption { min-height: 0; }
+.spread-celtic .p1 { grid-area: p1; }
+/* вторая карта ложится поперёк первой */
+.spread-celtic .p2 { grid-area: p1; z-index: 2; transform: rotate(90deg) scale(.78); }
+.spread-celtic .p2 figcaption { transform: rotate(-90deg); }
+.spread-celtic .p3 { grid-area: p3; }
+.spread-celtic .p4 { grid-area: p4; }
+.spread-celtic .p5 { grid-area: p5; }
+.spread-celtic .p6 { grid-area: p6; }
+.spread-celtic .p7 { grid-area: p7; }
+.spread-celtic .p8 { grid-area: p8; }
+.spread-celtic .p9 { grid-area: p9; }
+.spread-celtic .p10 { grid-area: p10; }
+.spread-celtic .slot.deal { animation-name: deal-fade; animation-delay: calc(var(--i) * 90ms); }
+.spread-celtic .p2.deal { animation-name: deal-fade-cross; }
+@keyframes deal-fade { from { opacity: 0; translate: 0 -12px; } to { opacity: 1; translate: none; } }
+@keyframes deal-fade-cross { from { opacity: 0; } to { opacity: 1; } }
+.spread-next { text-align: center; font-size: var(--px-xs); line-height: 1.8; }
+
 @media (prefers-reduced-motion: reduce) {
-  .m-line, .m-node, .mm-sq, .mm-dot, .zoom, .zoom-card, .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
+  .spread-option, .m-line, .m-node, .mm-sq, .mm-dot, .zoom, .zoom-card, .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
   .wheel { transition: none; }
   .flipped::after, .sweep { display: none; }
 }

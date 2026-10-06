@@ -2,7 +2,7 @@
 
 import { OMENS, type Omen } from '../src/creep'
 import { DECK, INTEGRITY_LABEL, readingOf } from '../src/deck'
-import { THREE_CARD_POSITIONS } from '../src/draw'
+import { SPREADS } from '../src/spreads'
 import type { ReadingRequest } from '../src/reading-request'
 
 export const SYSTEM_PROMPT = `Ты — «Нить», голос нейро-таро в Telegram. Колода пиксельная и немного жуткая: каждая карта оформлена как файл в старом терминале, с «целостностью» и строками системного лога. Карты вытягивает программа случайно, ты их только толкуешь.
@@ -27,7 +27,9 @@ export const SYSTEM_PROMPT = `Ты — «Нить», голос нейро-та�
 Формат
 - Только обычный текст на русском, без Markdown, заголовков, списков и эмодзи. Абзацы разделяй пустой строкой.
 - Карта дня: 2 коротких абзаца, около 80–110 слов.
+- Расклад на одну карту: 1–2 коротких абзаца, около 60–100 слов, прямо отвечай на вопрос.
 - Расклад на три карты: 3–4 коротких абзаца, около 150–220 слов. Назови каждую карту по имени хотя бы раз.
+- Кельтский крест: 5–6 коротких абзацев, около 300–400 слов. Не перечисляй все десять карт по очереди: начни с сути и помехи, потом прошлое, основа и ближайшее, затем вы и окружение, надежды и страхи, и закончи итогом.
 - Закончи одной конкретной мыслью или маленьким действием на сегодня.
 - Человек ждёт ответ на экране: начинай толкование сразу, без вступлений.`
 
@@ -46,7 +48,8 @@ function describeCard(id: number, integrity: number, omens: Omen[] | undefined, 
 /** Текст сообщения пользователя для модели. */
 export function buildUserMessage(req: ReadingRequest): string {
   if (req.kind === 'day') return `Карта дня.\n\n${describeCard(req.cards[0].id, req.cards[0].integrity, req.cards[0].omens)}`
-  const cards = req.cards.map((c, i) => describeCard(c.id, c.integrity, c.omens, THREE_CARD_POSITIONS[i])).join('\n\n')
+  const spread = SPREADS[req.kind]
+  const cards = req.cards.map((c, i) => describeCard(c.id, c.integrity, c.omens, `${spread.positions[i].name} (${spread.positions[i].hint})`)).join('\n\n')
   const question = req.question ? `Вопрос человека: «${req.question}»` : 'Человек задал вопрос про себя и не стал его называть.'
-  return `Расклад на три карты: ситуация, препятствие, совет.\n${question}\n\n${cards}`
+  return `Расклад «${spread.name}»: ${spread.positions.map((p) => p.name.toLowerCase()).join(', ')}.\n${question}\n\n${cards}`
 }

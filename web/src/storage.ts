@@ -1,9 +1,10 @@
 import { OMEN_KEYS, type Omen } from './creep'
+import type { SpreadKind } from './spreads'
 
 export interface HistoryEntry {
   id: string
   at: number
-  kind: 'day' | 'three'
+  kind: 'day' | SpreadKind
   cards: number[]
   /** Целостность каждой карты из cards, по порядку. */
   integrity?: number[]

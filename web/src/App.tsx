@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { omensFor, rollIntegrity, type Omen } from './creep'
 import { AiText } from './AiText'
 import { DECK, integrityState } from './deck'
-import { THREE_CARD_POSITIONS, cryptoRng, dayKey, drawCards } from './draw'
+import { cryptoRng, dayKey, drawCards } from './draw'
 import { QUESTION_MAX } from './reading-request'
+import { SPREADS, SPREAD_KINDS, type SpreadKind } from './spreads'
 import { FLIP_MS, PixelCard, ShuffleDeck } from './PixelCard'
 import { MatrixScreen } from './matrix/MatrixScreen'
 import { NatalScreen } from './natal/NatalScreen'
@@ -171,7 +172,7 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
       <div className="divider" aria-hidden="true" />
       <div className="actions">
         <button type="button" className={card ? 'btn primary wide' : 'btn'} onClick={onSpread}>
-          {card ? 'Расклад на три карты' : 'Три карты'}
+          {card ? 'Сделать расклад' : 'Расклад'}
         </button>
         <button type="button" className={card ? 'btn wide' : 'btn'} onClick={onDiary}>
           Дневник
@@ -181,9 +182,70 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
   )
 }
 
+/** Расклад: сначала выбор вида и вопрос, затем стол с картами. */
 function Spread({ onBack }: { onBack: () => void }) {
-  const deal = () => {
-    const drawn = drawCards(3)
+  const [kind, setKind] = useState<SpreadKind | null>(null)
+  const [question, setQuestion] = useState('')
+  // номер раздачи: новые карты всегда заново вылетают из колоды
+  const [round, setRound] = useState(0)
+
+  if (!kind)
+    return (
+      <section className="screen">
+        <ScreenHead title="Расклад" onBack={onBack} />
+        <p className="lede">Задайте вопрос или просто подумайте о нём, затем выберите расклад.</p>
+        <label className="question">
+          <span><span className="prompt">&gt;</span> вопрос к нити (необязательно)</span>
+          <textarea value={question} maxLength={QUESTION_MAX} rows={2} placeholder="Например: что мне важно понять про новую работу?" onChange={(e) => setQuestion(e.target.value)} />
+        </label>
+        <div className="spread-pick">
+          {SPREAD_KINDS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              className="spread-option"
+              onClick={() => {
+                play('shuffle')
+                haptic()
+                setRound((r) => r + 1)
+                setKind(k)
+              }}
+            >
+              <span className={`spread-icon ${k}`} aria-hidden="true">
+                {SPREADS[k].positions.map((_, i) => (
+                  <i key={i} />
+                ))}
+              </span>
+              <span className="spread-name">{SPREADS[k].name}</span>
+              <span className="spread-line">{SPREADS[k].line}</span>
+              <span className="spread-count">{SPREADS[k].positions.length}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    )
+
+  return (
+    <SpreadTable
+      key={round}
+      kind={kind}
+      question={question.trim()}
+      onBack={() => setKind(null)}
+      onAgain={() => {
+        play('tap')
+        setQuestion('')
+        setKind(null)
+      }}
+    />
+  )
+}
+
+/** Стол расклада: карты открываются по порядку позиций, затем общее толкование. */
+function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; question: string; onBack: () => void; onAgain: () => void }) {
+  const spread = SPREADS[kind]
+  const positions = spread.positions.map((p) => p.name)
+  const [dealt] = useState(() => {
+    const drawn = drawCards(positions.length)
     let prev = lastCardId()
     const rolls = drawn.map((c) => {
       const v = rollFor(c.id, prev)
@@ -191,19 +253,12 @@ function Spread({ onBack }: { onBack: () => void }) {
       return v
     })
     return { drawn, integrity: rolls.map((r) => r.integrity), omens: rolls.map((r) => r.omens) }
-  }
-  const [dealt, setDealt] = useState(deal)
-  // номер раздачи: новые карты всегда заново вылетают из колоды
-  const [round, setRound] = useState(0)
-  const cards = dealt.drawn
-  const integrity = dealt.integrity
-  const omens = dealt.omens
-  const [open, setOpen] = useState<boolean[]>([false, false, false])
+  })
+  const { drawn: cards, integrity, omens } = dealt
+  const [open, setOpen] = useState<boolean[]>(() => positions.map(() => false))
   const allOpen = open.every(Boolean)
-  // карты открываются по порядку: ситуация, препятствие, совет
+  // карты открываются по порядку позиций
   const next = open.indexOf(false)
-  const started = open.some(Boolean)
-  const [question, setQuestion] = useState('')
 
   const flip = (i: number) => {
     if (open[i]) return
@@ -215,61 +270,70 @@ function Spread({ onBack }: { onBack: () => void }) {
 
   // расклад попадает в дневник, когда открыта последняя карта
   useEffect(() => {
-    if (allOpen)
-      saveHistoryEntry({ kind: 'three', cards: cards.map((c) => c.id), integrity })
+    if (allOpen) saveHistoryEntry({ kind, cards: cards.map((c) => c.id), integrity })
   }, [allOpen])
 
-  const again = () => {
-    play('tap')
-    setDealt(deal())
-    setRound((r) => r + 1)
-    setOpen([false, false, false])
-    setQuestion('')
-  }
-
+  const many = kind === 'celtic'
   return (
     <section className="screen">
-      <ScreenHead title="Три карты" onBack={onBack} />
-      {!started && <p className="lede">Задайте вопрос или просто подумайте о нём, затем откройте карты по порядку.</p>}
-      {started ? (
-        question.trim() && <p className="asked">«{question.trim()}»</p>
-      ) : (
-        <label className="question">
-          <span><span className="prompt">&gt;</span> вопрос к нити (необязательно)</span>
-          <textarea value={question} maxLength={QUESTION_MAX} rows={2} placeholder="Например: что мне важно понять про новую работу?" onChange={(e) => setQuestion(e.target.value)} />
-        </label>
-      )}
-      <div className="stage three">
+      <ScreenHead title={spread.name} onBack={onBack} />
+      {question ? <p className="asked">«{question}»</p> : <p className="lede">{kind === 'one' ? 'Откройте карту.' : 'Откройте карты по порядку.'}</p>}
+      <div className={`stage spread-${kind}`}>
         {cards.map((c, i) => (
-          <figure key={`${round}-${i}`} className={`slot deal${i === next ? ' next' : ''}${!open[i] && i !== next ? ' wait' : ''}`} style={{ '--i': i } as CSSProperties}>
+          <figure
+            key={i}
+            className={`slot deal p${i + 1}${i === next ? ' next' : ''}${!open[i] && i !== next ? ' wait' : ''}`}
+            style={{ '--i': i } as CSSProperties}
+          >
             <PixelCard
               id={open[i] ? c.id : null}
               integrity={integrity[i]}
-              label={open[i] ? `${THREE_CARD_POSITIONS[i]}: ${c.name}, целостность ${integrity[i]}%` : `${THREE_CARD_POSITIONS[i]}, рубашка. Нажмите, чтобы открыть`}
+              label={open[i] ? `${positions[i]}: ${c.name}, целостность ${integrity[i]}%` : `${positions[i]}, рубашка. Нажмите, чтобы открыть`}
               onClick={i === next ? () => flip(i) : undefined}
             />
             <figcaption>
-              <span className="pos">{THREE_CARD_POSITIONS[i]}</span>
-              {open[i] ? <span className="nm">{c.name}</span> : i === next && <span className="tap">▸ коснитесь</span>}
+              <span className="pos">{many ? i + 1 : positions[i]}</span>
+              {!many && (open[i] ? <span className="nm">{c.name}</span> : i === next && <span className="tap">▸ коснитесь</span>)}
             </figcaption>
           </figure>
         ))}
       </div>
+      {many && next >= 0 && (
+        <p className="hint spread-next">
+          ▸ {next + 1} · {positions[next]}: {spread.positions[next].hint}
+        </p>
+      )}
       <div className="readings" aria-live="polite">
         {cards.map(
           (c, i) =>
             open[i] && (
-              <Reading key={`${round}-${i}`} card={c} integrity={integrity[i]} omens={omens[i]} position={THREE_CARD_POSITIONS[i]} delay={FLIP_MS} body={null} />
+              <Reading
+                key={i}
+                card={c}
+                integrity={integrity[i]}
+                omens={omens[i]}
+                position={many ? `${i + 1} · ${positions[i]}` : positions[i]}
+                delay={FLIP_MS}
+                body={
+                  kind === 'one' ? (
+                    <AiText
+                      request={{ kind, cards: [{ id: c.id, integrity: integrity[i], omens: omens[i] }], question: question || undefined }}
+                      delay={FLIP_MS + 1400}
+                      fallback={<ReadingText card={c} integrity={integrity[i]} />}
+                    />
+                  ) : null
+                }
+              />
             ),
         )}
-        {allOpen && (
-          <article key={round} className="reading summary">
+        {allOpen && kind !== 'one' && (
+          <article className="reading summary">
             <h2>&gt; толкование расклада</h2>
             <AiText
-              request={{ kind: 'three', cards: cards.map((c, i) => ({ id: c.id, integrity: integrity[i], omens: omens[i] })), question: question.trim() || undefined }}
+              request={{ kind, cards: cards.map((c, i) => ({ id: c.id, integrity: integrity[i], omens: omens[i] })), question: question || undefined }}
               delay={FLIP_MS + 1400}
               fallback={cards.map((c, i) => (
-                <ReadingText key={i} card={c} integrity={integrity[i]} label={THREE_CARD_POSITIONS[i]} />
+                <ReadingText key={i} card={c} integrity={integrity[i]} label={positions[i]} />
               ))}
             />
           </article>
@@ -279,7 +343,7 @@ function Spread({ onBack }: { onBack: () => void }) {
         <>
           <div className="divider" aria-hidden="true" />
           <div className="actions">
-            <button type="button" className="btn primary wide" onClick={again}>
+            <button type="button" className="btn primary wide" onClick={onAgain}>
               Новый расклад
             </button>
           </div>
@@ -302,7 +366,7 @@ function Diary({ onBack }: { onBack: () => void }) {
           {history.map((h) => (
             <li key={h.id}>
               <span className="when">
-                [{fmt.format(h.at)}] <span className="kind">{h.kind === 'day' ? 'карта дня' : 'три карты'}</span>
+                [{fmt.format(h.at)}] <span className="kind">{h.kind === 'day' ? 'карта дня' : SPREADS[h.kind].name}</span>
               </span>
               <span className="names">
                 {h.cards.map((id, i) => {
