@@ -26,13 +26,17 @@ export function PixelCard({ id, label, integrity = 100, animate = false, onClick
   // открыта ли карта с самого начала: тогда без анимации
   const [instant] = useState(id !== null && !animate)
 
+  // карта то кнопка, то просто картинка (в раскладе нажать можно только следующую):
+  // при смене обёртки холсты создаются заново, и их надо перерисовать
+  const clickable = !!onClick
+
   useEffect(() => {
     if (backRef.current) drawCardBack(backRef.current)
-  }, [])
+  }, [clickable])
 
   useEffect(() => {
     if (faceRef.current && id !== null) drawCardFace(faceRef.current, id, integrity)
-  }, [id, integrity])
+  }, [id, integrity, clickable])
 
   const state = integrityState(integrity)
   const cls = ['pcard-flip', id !== null && 'flipped', instant && 'instant', state !== 'whole' && state].filter(Boolean).join(' ')
