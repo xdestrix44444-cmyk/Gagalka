@@ -10,7 +10,8 @@ import { play } from '../sound'
 import { ASPECTS, PERIODS, PLANETS, POINTS, SIGNS, SIGNS_GEN, possibleAscendants, type Chart, type DayPeriod, type Element, type PlanetKey, type PointKey } from './chart'
 import { findCities, type City } from './cities'
 import { planetEmblem, signEmblem } from './emblems'
-import { chartOf, cityOf, deletePerson, hasBirthplace, loadPeople, savePerson, type Person } from './people'
+import { chartOf, cityOf, deletePerson, fmtDate, hasBirthplace, loadPeople, savePerson, type Person } from './people'
+import { ImportPerson, SendToFriend } from './ShareCode'
 import { skyToday } from './relations'
 import { renderShare, shareImage } from './share'
 import { SynastryView } from './Synastry'
@@ -25,9 +26,8 @@ const fmtDeg = (deg: number) => `${Math.floor(deg)}°${String(Math.floor((deg % 
 const planetName = (k: PlanetKey) => PLANETS.find((p) => p.key === k)!.name
 /** Творительный падеж для подписи связей: «трин с Юпитером». */
 const PLANET_WITH: Record<PlanetKey, string> = { sun: 'Солнцем', moon: 'Луной', mercury: 'Меркурием', venus: 'Венерой', mars: 'Марсом', jupiter: 'Юпитером', saturn: 'Сатурном', uranus: 'Ураном', neptune: 'Нептуном', pluto: 'Плутоном' }
-export const fmtDate = (d: string) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${d}T12:00:00`))
 
-type View = { kind: 'list' } | { kind: 'form'; person?: Person } | { kind: 'chart'; person: Person } | { kind: 'synastry' }
+type View = { kind: 'list' } | { kind: 'form'; person?: Person } | { kind: 'chart'; person: Person } | { kind: 'synastry' } | { kind: 'import' }
 
 /** Раздел натальных карт: список людей → форма → анимированная карта с портретом. */
 export function NatalScreen({ onBack }: { onBack: () => void }) {
@@ -35,10 +35,22 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
   const [view, setView] = useState<View>(() => (loadPeople().length ? { kind: 'list' } : { kind: 'form' }))
   const refresh = () => setPeople(loadPeople())
 
+  if (view.kind === 'import')
+    return (
+      <ImportPerson
+        onBack={() => setView(people.length ? { kind: 'list' } : { kind: 'form' })}
+        onAdded={(p) => {
+          refresh()
+          // без места рождения натальную карту не построить — сразу просим дополнить
+          setView(hasBirthplace(p) ? { kind: 'chart', person: p } : { kind: 'form', person: p })
+        }}
+      />
+    )
   if (view.kind === 'form')
     return (
       <PersonForm
         person={view.person}
+        onImport={() => setView({ kind: 'import' })}
         firstSelf={!people.some((p) => p.self)}
         onSave={(p) => {
           refresh()
@@ -103,6 +115,9 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
         <button type="button" className="btn primary wide" onClick={() => setView({ kind: 'form' })}>
           Новая карта
         </button>
+        <button type="button" className="btn wide" onClick={() => (play('tap'), setView({ kind: 'import' }))}>
+          Добавить по коду
+        </button>
         {complete.length >= 2 && (
           <button
             type="button"
@@ -120,7 +135,7 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
   )
 }
 
-export function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: Person; firstSelf: boolean; onSave: (p: Person) => void; onCancel: () => void }) {
+export function PersonForm({ person, firstSelf, onSave, onCancel, onImport }: { person?: Person; firstSelf: boolean; onSave: (p: Person) => void; onCancel: () => void; onImport?: () => void }) {
   const [name, setName] = useState(person?.name ?? '')
   const [date, setDate] = useState(person?.date ?? '')
   const [time, setTime] = useState(person?.time ?? '')
@@ -223,6 +238,11 @@ export function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: P
             Построить карту
           </button>
         </div>
+        {!person && onImport && (
+          <button type="button" className="link-quiet" onClick={onImport}>
+            у меня есть код от друга
+          </button>
+        )}
       </form>
     </section>
   )
@@ -564,6 +584,7 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
       )}
       <div className="divider" aria-hidden="true" />
       <div className="actions">
+        <SendToFriend person={person} />
         <button type="button" className="btn wide" onClick={onEdit}>
           Изменить данные
         </button>

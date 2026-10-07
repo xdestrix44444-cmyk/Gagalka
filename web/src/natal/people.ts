@@ -18,6 +18,9 @@ export interface Person {
   self: boolean
 }
 
+/** Дата рождения словами: «14 марта 1996 г.». */
+export const fmtDate = (d: string) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${d}T12:00:00`))
+
 const KEY = 'nit.people.v1'
 
 export function loadPeople(): Person[] {

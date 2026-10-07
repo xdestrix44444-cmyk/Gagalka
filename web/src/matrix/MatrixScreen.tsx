@@ -1,7 +1,7 @@
 import { useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { DECK } from '../deck'
-import { fmtDate } from '../natal/NatalScreen'
-import { loadPeople, savePerson, type Person } from '../natal/people'
+import { fmtDate, loadPeople, savePerson, type Person } from '../natal/people'
+import { ImportPerson, SendToFriend } from '../natal/ShareCode'
 import { PixelCard } from '../PixelCard'
 import { artOf } from '../sprites'
 import { play } from '../sound'
@@ -10,16 +10,27 @@ import { ScreenHead } from '../ui/ScreenHead'
 import { baseOf, coupleMatrix, deckId, matrixOf, reduce, type Matrix } from './calc'
 import { ARCANA, POINTS, textFor, type PointKey } from './meanings'
 
-type View = { kind: 'list' } | { kind: 'form' } | { kind: 'person'; person: Person } | { kind: 'couple' }
+type View = { kind: 'list' } | { kind: 'form' } | { kind: 'person'; person: Person } | { kind: 'couple' } | { kind: 'import' }
 
 /** Раздел «Матрица судьбы»: люди общие с натальной картой, для матрицы нужна только дата. */
 export function MatrixScreen({ onBack }: { onBack: () => void }) {
   const [people, setPeople] = useState(loadPeople)
   const [view, setView] = useState<View>(() => (people.length ? { kind: 'list' } : { kind: 'form' }))
 
+  if (view.kind === 'import')
+    return (
+      <ImportPerson
+        onBack={() => setView(people.length ? { kind: 'list' } : { kind: 'form' })}
+        onAdded={(p) => {
+          setPeople(loadPeople())
+          setView({ kind: 'person', person: p })
+        }}
+      />
+    )
   if (view.kind === 'form')
     return (
       <MatrixForm
+        onImport={() => setView({ kind: 'import' })}
         firstSelf={!people.some((p) => p.self)}
         onSave={(p) => {
           setPeople(loadPeople())
@@ -66,6 +77,9 @@ export function MatrixScreen({ onBack }: { onBack: () => void }) {
         <button type="button" className="btn primary wide" onClick={() => setView({ kind: 'form' })}>
           Новый человек
         </button>
+        <button type="button" className="btn wide" onClick={() => (play('tap'), setView({ kind: 'import' }))}>
+          Добавить по коду
+        </button>
         {people.length >= 2 && (
           <button
             type="button"
@@ -84,7 +98,7 @@ export function MatrixScreen({ onBack }: { onBack: () => void }) {
 }
 
 /** Форма матрицы: только имя и дата. Место и время рождения допишут, если захотят натальную карту. */
-function MatrixForm({ firstSelf, onSave, onCancel }: { firstSelf: boolean; onSave: (p: Person) => void; onCancel: () => void }) {
+function MatrixForm({ firstSelf, onSave, onCancel, onImport }: { firstSelf: boolean; onSave: (p: Person) => void; onCancel: () => void; onImport: () => void }) {
   const [name, setName] = useState('')
   const [date, setDate] = useState('')
   const [self, setSelf] = useState(firstSelf)
@@ -123,6 +137,9 @@ function MatrixForm({ firstSelf, onSave, onCancel }: { firstSelf: boolean; onSav
             Рассчитать матрицу
           </button>
         </div>
+        <button type="button" className="link-quiet" onClick={onImport}>
+          у меня есть код от друга
+        </button>
       </form>
     </section>
   )
@@ -353,6 +370,9 @@ function PersonMatrix({ person, onBack }: { person: Person; onBack: () => void }
       <p className="hint-small m-hint">коснитесь точки, чтобы узнать её смысл</p>
       <Caption m={m} k={sel} />
       <Sections m={m} sections={SECTIONS} sel={sel} onSel={showPoint} />
+      <div className="actions">
+        <SendToFriend person={person} />
+      </div>
       <p className="hint-small">Матрица судьбы — нумерологическая система, а не наука. Читайте её как повод подумать о себе.</p>
     </section>
   )
