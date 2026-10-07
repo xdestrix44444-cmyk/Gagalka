@@ -239,12 +239,6 @@ export function possibleAscendants(date: string, period: DayPeriod, timeZone: st
 /** Середина части суток — время для расчёта планет, когда известен только период. */
 export const periodMidpoint = (period: DayPeriod) => `${String(PERIODS.find((p) => p.key === period)!.from + 3).padStart(2, '0')}:00`
 
-/** Аркан рождения: сумма всех цифр даты, сводимая к 1–22; 22 — Шут (0). */
-export function birthArcana(date: string): number {
-  let n = [...date.replace(/-/g, '')].reduce((sum, d) => sum + Number(d), 0)
-  while (n > 22) n = [...String(n)].reduce((sum, d) => sum + Number(d), 0)
-  return n === 22 ? 0 : n
-}
 
 /** Местное время рождения в часовом поясе города → момент UTC (с историческими сдвигами поясов). */
 export function localToUtc(date: string, time: string, timeZone: string): Date {

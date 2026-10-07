@@ -96,28 +96,12 @@ describe('полярные карты', () => {
   })
 })
 
-describe('узлы, Лилит, аркан, транзиты', () => {
+describe('узлы, Лилит, транзиты', () => {
   it('средние узел и Лилит на J2000: узел ~125° (Лев), Лилит ~263° (Стрелец)', async () => {
     const { meanNode, meanLilith } = await import('./chart')
     const j2000 = new Date(Date.UTC(2000, 0, 1, 12))
     expect(meanNode(j2000)).toBeCloseTo(125.04, 1)
     expect(meanLilith(j2000)).toBeCloseTo(263.35, 1)
-  })
-
-  it('аркан рождения сводится к 1–22, а 22 — это Шут', async () => {
-    const { birthArcana } = await import('./chart')
-    expect(birthArcana('1995-03-21')).toBe(launchSum('1995-03-21'))
-    expect(birthArcana('1999-12-29')).toBeGreaterThanOrEqual(0)
-    expect(birthArcana('1999-12-29')).toBeLessThanOrEqual(21)
-    // 2+0+0+2+0+2+0+9 = 15 → Дьявол
-    expect(birthArcana('2002-02-09')).toBe(15)
-    // 1+9+9+9+0+9+1+3 = 41 → 4+1 = 5
-    expect(birthArcana('1999-09-13')).toBe(5)
-    function launchSum(d: string) {
-      let n = [...d.replace(/-/g, '')].reduce((s, c) => s + Number(c), 0)
-      while (n > 22) n = [...String(n)].reduce((s, c) => s + Number(c), 0)
-      return n === 22 ? 0 : n
-    }
   })
 
   it('возможные Асценденты за 6 часов: 2–5 знаков по порядку', async () => {

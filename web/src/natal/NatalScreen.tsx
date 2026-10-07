@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { DECK } from '../deck'
+import { deckId, matrixOf } from '../matrix/calc'
+import { ARCANA } from '../matrix/meanings'
 import { PixelCard } from '../PixelCard'
 import { hasArt } from '../sprites'
 import { ScreenHead } from '../ui/ScreenHead'
 import { play } from '../sound'
-import { ASPECTS, PERIODS, PLANETS, POINTS, SIGNS, SIGNS_GEN, birthArcana, possibleAscendants, type Chart, type DayPeriod, type Element, type PlanetKey, type PointKey } from './chart'
+import { ASPECTS, PERIODS, PLANETS, POINTS, SIGNS, SIGNS_GEN, possibleAscendants, type Chart, type DayPeriod, type Element, type PlanetKey, type PointKey } from './chart'
 import { findCities, type City } from './cities'
 import { planetEmblem, signEmblem } from './emblems'
 import { chartOf, cityOf, deletePerson, hasBirthplace, loadPeople, savePerson, type Person } from './people'
@@ -229,7 +231,9 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
   const chart = useMemo(() => chartOf(person), [person])
   const sections = useMemo(() => portrait(chart), [chart])
   const ascOptions = useMemo(() => (!person.time && person.period && city ? possibleAscendants(person.date, person.period, city.tz, city) : null), [person, city])
-  const arcana = birthArcana(person.date)
+  // аркан судьбы — центр матрицы: та же карта, что в разделе «Матрица судьбы»
+  const destiny = matrixOf(person.date).e
+  const arcana = deckId(destiny)
   const [mode, setMode] = useState<'natal' | 'sky'>('natal')
   const sky = useMemo(() => (mode === 'sky' ? skyToday(chart) : null), [mode, chart])
   const overlay: Overlay | undefined = sky ? { kind: 'sky', planets: sky.chart.planets, aspects: sky.transits } : undefined
@@ -538,20 +542,20 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
             </article>
           ))}
           <article className="reading portrait-part arcana">
-            <h2>&gt; аркан рождения</h2>
+            <h2>&gt; аркан судьбы</h2>
             <div className="arcana-row">
               <div className="arcana-card">
                 <PixelCard id={hasArt(arcana) ? arcana : null} label={`${DECK[arcana].numeral} · ${DECK[arcana].name}`} />
               </div>
               <div>
                 <p className="arcana-name">
-                  {DECK[arcana].numeral} · {DECK[arcana].name}
+                  {destiny} · {ARCANA[destiny].name}
                 </p>
-                <p className="hint-small">сумма цифр даты рождения, сведённая к 22 старшим арканам{hasArt(arcana) ? '' : ' · рисунок этой карты ещё в работе'}</p>
+                <p className="hint-small">центр вашей матрицы судьбы · {ARCANA[destiny].key}{hasArt(arcana) ? '' : ' · рисунок этой карты ещё в работе'}</p>
               </div>
             </div>
-            <p className="text">{DECK[arcana].text}</p>
-            <p className="text">Это ваша карта-спутник в колоде «Нить». Если она выпадет в раскладе, отнеситесь к ней особенно внимательно: она говорит о вас самих.</p>
+            <p className="text">{ARCANA[destiny].plus}</p>
+            <p className="text">Это ваша карта-спутник в колоде «Нить». Если она выпадет в раскладе, отнеситесь к ней особенно внимательно: она говорит о вас самих. Подробнее — в разделе «Матрица судьбы».</p>
           </article>
           {!person.time && <p className="hint-small">Без точного времени рождения карта неполная: нет домов, Асцендент неизвестен, а положение Луны примерное.</p>}
         </div>
