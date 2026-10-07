@@ -5,6 +5,7 @@ import { loadPeople, savePerson, type Person } from '../natal/people'
 import { PixelCard } from '../PixelCard'
 import { artOf } from '../sprites'
 import { play } from '../sound'
+import { DateField } from '../ui/DateField'
 import { ScreenHead } from '../ui/ScreenHead'
 import { baseOf, coupleMatrix, deckId, matrixOf, reduce, type Matrix } from './calc'
 import { ARCANA, POINTS, textFor, type PointKey } from './meanings'
@@ -93,7 +94,8 @@ function MatrixForm({ firstSelf, onSave, onCancel }: { firstSelf: boolean; onSav
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return setError('Как зовут человека?')
-    if (!date || date < '1900-01-01' || date > today) return setError('Укажите дату рождения')
+    if (!date) return setError('Укажите дату рождения цифрами: ДД.ММ.ГГГГ')
+    if (date < '1900-01-01' || date > today) return setError('Проверьте год рождения')
     play('tap')
     onSave(savePerson({ name: name.trim(), date, time: null, city: '', region: '', self }))
   }
@@ -109,7 +111,7 @@ function MatrixForm({ firstSelf, onSave, onCancel }: { firstSelf: boolean; onSav
         </label>
         <label>
           <span><span className="prompt">&gt;</span> дата рождения</span>
-          <input type="date" value={date} min="1900-01-01" max={today} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </label>
         <label className="check">
           <input type="checkbox" checked={self} onChange={(e) => setSelf(e.target.checked)} />

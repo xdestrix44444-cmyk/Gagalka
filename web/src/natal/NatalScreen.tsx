@@ -4,6 +4,7 @@ import { deckId, matrixOf } from '../matrix/calc'
 import { ARCANA } from '../matrix/meanings'
 import { PixelCard } from '../PixelCard'
 import { hasArt } from '../sprites'
+import { DateField } from '../ui/DateField'
 import { ScreenHead } from '../ui/ScreenHead'
 import { play } from '../sound'
 import { ASPECTS, PERIODS, PLANETS, POINTS, SIGNS, SIGNS_GEN, possibleAscendants, type Chart, type DayPeriod, type Element, type PlanetKey, type PointKey } from './chart'
@@ -137,7 +138,8 @@ export function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: P
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return setError('Как зовут человека?')
-    if (!date || date < '1900-01-01' || date > today) return setError('Укажите дату рождения')
+    if (!date) return setError('Укажите дату рождения цифрами: ДД.ММ.ГГГГ')
+    if (date < '1900-01-01' || date > today) return setError('Проверьте год рождения')
     if (!noTime && !time) return setError('Укажите время или отметьте «не знаю время»')
     if (!city) return setError('Выберите город из списка')
     play('tap')
@@ -155,7 +157,7 @@ export function PersonForm({ person, firstSelf, onSave, onCancel }: { person?: P
         </label>
         <label>
           <span><span className="prompt">&gt;</span> дата рождения</span>
-          <input type="date" value={date} min="1900-01-01" max={today} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </label>
         <label>
           <span><span className="prompt">&gt;</span> время рождения</span>
