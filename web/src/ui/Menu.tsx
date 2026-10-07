@@ -107,7 +107,7 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
           <span className="prompt">&gt;</span>{' '}
           {link === 'dial' ? (
             <>
-              дозвон… <span className="dial-bar">{'▓'.repeat(Math.round(progress * 12))}{'░'.repeat(12 - Math.round(progress * 12))}</span>
+              идёт синхронизация… <span className="dial-bar">{'▓'.repeat(Math.round(progress * 12))}{'░'.repeat(12 - Math.round(progress * 12))}</span>
             </>
           ) : (
             'связь установлена'
