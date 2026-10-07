@@ -4,6 +4,7 @@ import { PixelCard } from './PixelCard'
 import { ReadingText } from './Reading'
 import { play } from './sound'
 import { SPREADS } from './spreads'
+import { VERDICT_LABEL, verdictOf } from './yesno'
 import { OUTCOMES, entryIntegrity, loadHistory, updateHistoryEntry, type HistoryEntry, type Outcome } from './storage'
 import { ScreenHead } from './ui/ScreenHead'
 import { ShareReading } from './ui/ShareReading'
@@ -82,6 +83,7 @@ function DiaryEntry({ entry, onBack }: { entry: HistoryEntry; onBack: () => void
   const [outcome, setOutcome] = useState<Outcome | undefined>(entry.outcome)
   const positions = positionsOf(entry)
   const cards = useMemo(() => entry.cards.map((id, i) => ({ id, integrity: entryIntegrity(entry, i) ?? 95, label: positions[i] })), [entry])
+  const verdict = entry.kind === 'yesno' ? verdictOf(cards[0].id, cards[0].integrity) : null
 
   // заметка сохраняется сама: через полсекунды после правки и при уходе с экрана
   const latest = useRef(note)
@@ -106,6 +108,11 @@ function DiaryEntry({ entry, onBack }: { entry: HistoryEntry; onBack: () => void
       <ScreenHead title={kindName(entry).replace(/^./, (c) => c.toUpperCase())} onBack={onBack} />
       <p className="lede">{fmt.format(entry.at)}</p>
       {entry.question && <p className="asked">«{entry.question}»</p>}
+      {verdict && (
+        <p className={`verdict v-${verdict}`}>
+          <span className="prompt">&gt;</span> ответ: <b>{VERDICT_LABEL[verdict]}</b>
+        </p>
+      )}
       <div className={`diary-cards n${Math.min(cards.length, 5)}`}>
         {cards.map((c, i) => (
           <figure key={i} className="slot">

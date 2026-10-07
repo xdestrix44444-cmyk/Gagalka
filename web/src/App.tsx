@@ -4,7 +4,8 @@ import { AiText } from './AiText'
 import { DECK, integrityState } from './deck'
 import { cryptoRng, dayKey, drawCards } from './draw'
 import { QUESTION_MAX } from './reading-request'
-import { SPREADS, SPREAD_KINDS, type SpreadKind } from './spreads'
+import { QUESTION_TOPICS, SPREADS, SPREAD_GROUPS, type SpreadKind } from './spreads'
+import { VERDICT_LABEL, VERDICT_NOTE, verdictOf } from './yesno'
 import { FLIP_MS, PixelCard, ShuffleDeck } from './PixelCard'
 import { MatrixScreen } from './matrix/MatrixScreen'
 import { NatalScreen } from './natal/NatalScreen'
@@ -244,12 +245,23 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
   )
 }
 
-/** Расклад: сначала выбор вида и вопрос, затем стол с картами. */
+/** Расклад: сначала вопрос (свой или из готовых) и выбор вида, затем стол с картами. */
 function Spread({ onBack }: { onBack: () => void }) {
   const [kind, setKind] = useState<SpreadKind | null>(null)
   const [question, setQuestion] = useState('')
+  // готовый вопрос подсказывает расклад; свой текст подсказку снимает
+  const [suggested, setSuggested] = useState<SpreadKind | null>(null)
+  const [topic, setTopic] = useState<number | null>(null)
   // номер раздачи: новые карты всегда заново вылетают из колоды
   const [round, setRound] = useState(0)
+  const pickRef = useRef<HTMLDivElement>(null)
+
+  const start = (k: SpreadKind) => {
+    play('shuffle')
+    haptic()
+    setRound((r) => r + 1)
+    setKind(k)
+  }
 
   if (!kind)
     return (
@@ -258,30 +270,75 @@ function Spread({ onBack }: { onBack: () => void }) {
         <p className="lede">Задайте вопрос или просто подумайте о нём, затем выберите расклад.</p>
         <label className="question">
           <span><span className="prompt">&gt;</span> вопрос к нити (необязательно)</span>
-          <textarea value={question} maxLength={QUESTION_MAX} rows={2} placeholder="Например: что мне важно понять про новую работу?" onChange={(e) => setQuestion(e.target.value)} />
+          <textarea
+            value={question}
+            maxLength={QUESTION_MAX}
+            rows={2}
+            placeholder="Например: что мне важно понять про новую работу?"
+            onChange={(e) => {
+              setQuestion(e.target.value)
+              setSuggested(null)
+            }}
+          />
         </label>
-        <div className="spread-pick">
-          {SPREAD_KINDS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              className="spread-option"
-              onClick={() => {
-                play('shuffle')
-                haptic()
-                setRound((r) => r + 1)
-                setKind(k)
-              }}
-            >
-              <span className={`spread-icon ${k}`} aria-hidden="true">
-                {SPREADS[k].positions.map((_, i) => (
-                  <i key={i} />
-                ))}
-              </span>
-              <span className="spread-name">{SPREADS[k].name}</span>
-              <span className="spread-line">{SPREADS[k].line}</span>
-              <span className="spread-count">{SPREADS[k].positions.length}</span>
-            </button>
+        <div className="ask-help">
+          <p className="hint">
+            <span className="prompt">&gt;</span> не знаете, как спросить? спрашивайте «что» и «как», а не «когда». Для «будет ли» есть «Да или нет».
+          </p>
+          <div className="seg-row ask-topics">
+            {QUESTION_TOPICS.map((t, i) => (
+              <button
+                key={t.name}
+                type="button"
+                aria-pressed={topic === i}
+                onClick={() => {
+                  play('tap')
+                  setTopic(topic === i ? null : i)
+                }}
+              >
+                {t.name}
+              </button>
+            ))}
+          </div>
+          {topic !== null && (
+            <ul className="ask-list">
+              {QUESTION_TOPICS[topic].questions.map((q) => (
+                <li key={q.text}>
+                  <button
+                    type="button"
+                    className={question === q.text ? 'ask-q on' : 'ask-q'}
+                    onClick={() => {
+                      play('tap')
+                      setQuestion(q.text)
+                      setSuggested(q.kind)
+                      setTimeout(() => pickRef.current?.querySelector('.suggested')?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' }), 0)
+                    }}
+                  >
+                    {q.text}
+                    <span className="ask-kind">{SPREADS[q.kind].name.toLowerCase()}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="spread-pick" ref={pickRef}>
+          {SPREAD_GROUPS.map((g) => (
+            <div key={g.name} className="spread-group">
+              <h3 className="spread-group-name">{g.name}</h3>
+              {g.kinds.map((k) => (
+                <button key={k} type="button" className={k === suggested ? 'spread-option suggested' : 'spread-option'} onClick={() => start(k)}>
+                  <span className={`spread-icon ${SPREADS[k].layout} n${SPREADS[k].positions.length}`} aria-hidden="true">
+                    {SPREADS[k].positions.map((_, i) => (
+                      <i key={i} />
+                    ))}
+                  </span>
+                  <span className="spread-name">{SPREADS[k].name}</span>
+                  <span className="spread-line">{k === suggested ? '▸ подходит к вашему вопросу' : SPREADS[k].line}</span>
+                  <span className="spread-count">{SPREADS[k].positions.length}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       </section>
@@ -342,12 +399,14 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
     else pendingAi.current = ai
   }
 
-  const many = kind === 'celtic'
+  const many = spread.layout === 'celtic'
+  const single = cards.length === 1
+  const verdict = kind === 'yesno' ? verdictOf(cards[0].id, integrity[0]) : null
   return (
     <section className="screen">
       <ScreenHead title={spread.name} onBack={onBack} />
-      {question ? <p className="asked">«{question}»</p> : <p className="lede">{kind === 'one' ? 'Откройте карту.' : 'Откройте карты по порядку.'}</p>}
-      <div className={`stage spread-${kind}`}>
+      {question ? <p className="asked">«{question}»</p> : <p className="lede">{single ? 'Откройте карту.' : 'Откройте карты по порядку.'}</p>}
+      <div className={`stage spread-${spread.layout} n${cards.length}`}>
         {cards.map((c, i) => (
           <figure
             key={i}
@@ -384,19 +443,31 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
                 position={many ? `${i + 1} · ${positions[i]}` : positions[i]}
                 delay={FLIP_MS}
                 body={
-                  kind === 'one' ? (
-                    <AiText
-                      request={{ kind, cards: [{ id: c.id, integrity: integrity[i], omens: omens[i] }], question: question || undefined }}
-                      delay={FLIP_MS + 1400}
-                      fallback={<ReadingText card={c} integrity={integrity[i]} />}
-                      onDone={saveAi}
-                    />
+                  single ? (
+                    <>
+                      {verdict && (
+                        <p className={`verdict v-${verdict}`}>
+                          <span className="prompt">&gt;</span> ответ: <b>{VERDICT_LABEL[verdict]}</b>
+                        </p>
+                      )}
+                      <AiText
+                        request={{ kind, cards: [{ id: c.id, integrity: integrity[i], omens: omens[i] }], question: question || undefined }}
+                        delay={FLIP_MS + 1400}
+                        fallback={
+                          <>
+                            {verdict && <p className="text">{VERDICT_NOTE[verdict]}</p>}
+                            <ReadingText card={c} integrity={integrity[i]} />
+                          </>
+                        }
+                        onDone={saveAi}
+                      />
+                    </>
                   ) : null
                 }
               />
             ),
         )}
-        {allOpen && kind !== 'one' && (
+        {allOpen && !single && (
           <article className="reading summary">
             <h2>&gt; толкование расклада</h2>
             <AiText

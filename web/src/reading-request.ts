@@ -20,7 +20,7 @@ export interface ReadingRequest {
 export function parseReadingRequest(raw: unknown): ReadingRequest | string {
   if (!raw || typeof raw !== 'object') return 'ожидается объект'
   const r = raw as Record<string, unknown>
-  if (r.kind !== 'day' && !isSpreadKind(r.kind)) return 'kind: day, one, three или celtic'
+  if (r.kind !== 'day' && !isSpreadKind(r.kind)) return `kind: day или ${Object.keys(SPREADS).join(', ')}`
   const want = r.kind === 'day' ? 1 : SPREADS[r.kind].positions.length
   if (!Array.isArray(r.cards) || r.cards.length !== want) return `cards: нужно ${want}`
   const cards: ReadingRequest['cards'] = []

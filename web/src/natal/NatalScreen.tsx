@@ -13,6 +13,7 @@ import { planetEmblem, signEmblem } from './emblems'
 import { chartOf, cityOf, deletePerson, fmtDate, hasBirthplace, loadPeople, savePerson, type Person } from './people'
 import { ImportPerson, SendToFriend } from './ShareCode'
 import { skyToday } from './relations'
+import { SignHoroscope } from './SignHoroscope'
 import { STORIES_ENABLED } from '../ui/ShareReading'
 import { renderShare, shareImage } from './share'
 import { SynastryView } from './Synastry'
@@ -28,18 +29,18 @@ const planetName = (k: PlanetKey) => PLANETS.find((p) => p.key === k)!.name
 /** Творительный падеж для подписи связей: «трин с Юпитером». */
 const PLANET_WITH: Record<PlanetKey, string> = { sun: 'Солнцем', moon: 'Луной', mercury: 'Меркурием', venus: 'Венерой', mars: 'Марсом', jupiter: 'Юпитером', saturn: 'Сатурном', uranus: 'Ураном', neptune: 'Нептуном', pluto: 'Плутоном' }
 
-type View = { kind: 'list' } | { kind: 'form'; person?: Person } | { kind: 'chart'; person: Person } | { kind: 'synastry' } | { kind: 'import' }
+type View = { kind: 'list' } | { kind: 'form'; person?: Person } | { kind: 'chart'; person: Person; sky?: boolean } | { kind: 'synastry' } | { kind: 'import' }
 
-/** Раздел натальных карт: список людей → форма → анимированная карта с портретом. */
+/** Раздел «Небо»: гороскоп по знаку, затем натальные карты — список людей → форма → анимированная карта с портретом. */
 export function NatalScreen({ onBack }: { onBack: () => void }) {
   const [people, setPeople] = useState(loadPeople)
-  const [view, setView] = useState<View>(() => (loadPeople().length ? { kind: 'list' } : { kind: 'form' }))
+  const [view, setView] = useState<View>({ kind: 'list' })
   const refresh = () => setPeople(loadPeople())
 
   if (view.kind === 'import')
     return (
       <ImportPerson
-        onBack={() => setView(people.length ? { kind: 'list' } : { kind: 'form' })}
+        onBack={() => setView({ kind: 'list' })}
         onAdded={(p) => {
           refresh()
           // без места рождения натальную карту не построить — сразу просим дополнить
@@ -57,7 +58,7 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
           refresh()
           setView({ kind: 'chart', person: p })
         }}
-        onCancel={() => (people.length ? setView({ kind: 'list' }) : onBack())}
+        onCancel={() => setView({ kind: 'list' })}
       />
     )
   // совместимость и натальный круг — только для людей с местом рождения
@@ -67,20 +68,34 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
     return (
       <NatalChart
         person={view.person}
+        startSky={view.sky}
         onBack={() => setView({ kind: 'list' })}
         onEdit={() => setView({ kind: 'form', person: view.person })}
         onDelete={() => {
           deletePerson(view.person.id)
           refresh()
-          setView(loadPeople().length ? { kind: 'list' } : { kind: 'form' })
+          setView({ kind: 'list' })
         }}
       />
     )
 
+  const self = people.find((p) => p.self)
   return (
     <section className="screen">
-      <ScreenHead title="Натальные карты" onBack={onBack} />
-      <p className="lede">Карта неба в момент рождения. Своя и тех, кто рядом.</p>
+      <ScreenHead title="Небо" onBack={onBack} />
+      <SignHoroscope ownSign={self ? sunSign(self) : null} />
+      {self && hasBirthplace(self) && (
+        <button type="button" className="btn wide" onClick={() => (play('flip'), setView({ kind: 'chart', person: self, sky: true }))}>
+          Небо сегодня для вашей карты
+        </button>
+      )}
+      <div className="divider" aria-hidden="true" />
+      <h2 className="section-title">
+        <span className="prompt">&gt;</span> натальные карты
+      </h2>
+      <p className="lede">
+        {people.length ? 'Карта неба в момент рождения. Своя и тех, кто рядом.' : 'Карта неба в момент рождения: точнее гороскопа по знаку. Постройте свою — и здесь появится небо сегодня лично для вас.'}
+      </p>
       <ul className="people">
         {people.map((p) => (
           <li key={p.id}>
@@ -114,7 +129,7 @@ export function NatalScreen({ onBack }: { onBack: () => void }) {
       <div className="divider" aria-hidden="true" />
       <div className="actions">
         <button type="button" className="btn primary wide" onClick={() => setView({ kind: 'form' })}>
-          Новая карта
+          {self ? 'Новая карта' : 'Построить свою карту'}
         </button>
         <button type="button" className="btn wide" onClick={() => (play('tap'), setView({ kind: 'import' }))}>
           Добавить по коду
@@ -249,7 +264,7 @@ export function PersonForm({ person, firstSelf, onSave, onCancel, onImport }: { 
   )
 }
 
-function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBack: () => void; onEdit: () => void; onDelete: () => void }) {
+function NatalChart({ person, startSky, onBack, onEdit, onDelete }: { person: Person; startSky?: boolean; onBack: () => void; onEdit: () => void; onDelete: () => void }) {
   const city = cityOf(person)
   const chart = useMemo(() => chartOf(person), [person])
   const sections = useMemo(() => portrait(chart), [chart])
@@ -296,6 +311,11 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
     timers.push(setTimeout(() => setBuilt(true), total))
     return () => timers.forEach(clearTimeout)
   }, [chart, total, still])
+
+  // пришли за «небом сегодня»: включаем его, когда круг достроен
+  useEffect(() => {
+    if (built && startSky) setMode('sky')
+  }, [built])
 
   const pickPlanet = (k: PlanetKey) => {
     play('tap')

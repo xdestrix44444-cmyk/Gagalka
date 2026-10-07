@@ -80,3 +80,40 @@ describe('промпт', () => {
     expect(SYSTEM_PROMPT).toContain('Не давай гарантий')
   })
 })
+
+describe('да или нет', () => {
+  it('ответ зависит от карты и целостности', async () => {
+    const { verdictOf } = await import('../src/yesno')
+    expect(verdictOf(19, 95)).toBe('yes') // Солнце
+    expect(verdictOf(19, 70)).toBe('likely')
+    expect(verdictOf(19, 40)).toBe('unlikely')
+    expect(verdictOf(16, 95)).toBe('no') // Башня
+    expect(verdictOf(16, 70)).toBe('unlikely')
+    expect(verdictOf(2, 95)).toBe('unclear') // Жрица
+    expect(verdictOf(2, 30)).toBe('no')
+  })
+
+  it('у каждой из 78 карт есть склонность', async () => {
+    const { leanOf } = await import('../src/yesno')
+    for (let id = 0; id < 78; id++) expect(['yes', 'maybe', 'no']).toContain(leanOf(id))
+    expect(leanOf(78)).toBeUndefined()
+  })
+
+  it('промпт передаёт ответ программы и объём', () => {
+    const msg = buildUserMessage({ kind: 'yesno', cards: [{ id: 19, integrity: 99 }], question: 'получится?' })
+    expect(msg).toContain('Ответ программы: ДА.')
+    expect(msg).toContain('Объём: 1–2 коротких абзаца')
+  })
+
+  it('все расклады принимаются с нужным числом карт', async () => {
+    const { SPREADS, SPREAD_KINDS, SPREAD_GROUPS, QUESTION_TOPICS } = await import('../src/spreads')
+    for (const k of SPREAD_KINDS) {
+      const n = SPREADS[k].positions.length
+      const cards = Array.from({ length: n }, (_, i) => ({ id: i, integrity: 90 }))
+      expect(typeof parseReadingRequest({ kind: k, cards })).toBe('object')
+    }
+    // каждый расклад есть на экране выбора, и готовые вопросы ведут в существующие расклады
+    expect(SPREAD_GROUPS.flatMap((g) => g.kinds).sort()).toEqual([...SPREAD_KINDS].sort())
+    for (const t of QUESTION_TOPICS) for (const q of t.questions) expect(SPREAD_KINDS).toContain(q.kind)
+  })
+})

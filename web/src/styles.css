@@ -600,15 +600,18 @@ button.pcard-wrap.zoomable { cursor: zoom-in; }
 .m-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: end; }
 .m-plus { font-family: var(--pix); font-size: var(--px-l); color: var(--teal); padding-bottom: 10px; }
 
-/* выбор расклада: строки с мини-схемой раскладки */
-.spread-pick { display: grid; gap: 10px; }
+/* выбор расклада: строки с мини-схемой раскладки, по группам */
+.spread-pick { display: grid; gap: 18px; }
+.spread-group { display: grid; gap: 10px; }
+.spread-group-name { margin: 0; font-family: var(--pix); font-size: var(--px-xs); line-height: 1.8; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
 .spread-option { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; grid-template-areas: 'icon name count' 'icon line count';
   column-gap: 14px; row-gap: 2px; align-items: center; padding: 6px 8px 6px 4px;
   border: 12px solid transparent; border-image: var(--frame-rust) 4 / 12px / 0 stretch; background: var(--panel); background-clip: padding-box; animation: panel-in .42s var(--ease-out) backwards; }
-.spread-option:nth-child(2) { animation-delay: 70ms; }
-.spread-option:nth-child(3) { animation-delay: 140ms; }
-.spread-option:hover, .spread-option:focus-visible { border-image-source: var(--frame-teal); outline: none; }
-.spread-option:hover .spread-name, .spread-option:focus-visible .spread-name { color: var(--teal); }
+.spread-option:nth-child(3) { animation-delay: 70ms; }
+.spread-option:nth-child(4) { animation-delay: 140ms; }
+.spread-option:hover, .spread-option:focus-visible, .spread-option.suggested { border-image-source: var(--frame-teal); outline: none; }
+.spread-option:hover .spread-name, .spread-option:focus-visible .spread-name, .spread-option.suggested .spread-name, .spread-option.suggested .spread-line { color: var(--teal); }
+.spread-option.suggested .spread-line { font-family: var(--mono); font-style: normal; font-size: var(--fs-meta); }
 .spread-name { grid-area: name; align-self: end; font-family: var(--pix); font-size: var(--px-s); line-height: 1.6; }
 .spread-line { grid-area: line; align-self: start; font-family: var(--serif); font-style: italic; font-size: 1rem; line-height: 1.35; color: var(--muted); }
 .spread-count { grid-area: count; font-family: var(--pix); font-size: var(--px-l); color: var(--rust); }
@@ -616,10 +619,27 @@ button.pcard-wrap.zoomable { cursor: zoom-in; }
 .spread-icon { grid-area: icon; position: relative; width: 64px; height: 56px; }
 .spread-icon i { position: absolute; width: 12px; height: 18px; border: 1px solid var(--rust); background: #120c0c; }
 .spread-icon.one i { left: 22px; top: 12px; width: 20px; height: 30px; border-color: var(--teal); }
-.spread-icon.three i { top: 16px; width: 16px; height: 24px; }
-.spread-icon.three i:nth-child(1) { left: 4px; }
-.spread-icon.three i:nth-child(2) { left: 24px; }
-.spread-icon.three i:nth-child(3) { left: 44px; }
+.spread-icon.row.n3 i { top: 16px; width: 16px; height: 24px; }
+.spread-icon.row.n3 i:nth-child(1) { left: 4px; }
+.spread-icon.row.n3 i:nth-child(2) { left: 24px; }
+.spread-icon.row.n3 i:nth-child(3) { left: 44px; }
+.spread-icon.row.n4 i { top: 18px; width: 13px; height: 20px; }
+.spread-icon.row.n4 i:nth-child(1) { left: 1px; }
+.spread-icon.row.n4 i:nth-child(2) { left: 17px; }
+.spread-icon.row.n4 i:nth-child(3) { left: 33px; }
+.spread-icon.row.n4 i:nth-child(4) { left: 49px; border-color: var(--teal); }
+/* отношения: вы и другой по бокам, между вами в центре, помеха под ним, куда идёт — над ним */
+.spread-icon.love i:nth-child(1) { left: 6px; top: 19px; }
+.spread-icon.love i:nth-child(2) { left: 46px; top: 19px; }
+.spread-icon.love i:nth-child(3) { left: 26px; top: 19px; border-color: var(--teal); }
+.spread-icon.love i:nth-child(4) { left: 26px; top: 38px; height: 16px; }
+.spread-icon.love i:nth-child(5) { left: 26px; top: 0; height: 16px; }
+/* выбор: суть в центре, путь А слева, путь Б справа, итоги под ними */
+.spread-icon.choice i:nth-child(1) { left: 26px; top: 8px; border-color: var(--teal); }
+.spread-icon.choice i:nth-child(2) { left: 6px; top: 8px; }
+.spread-icon.choice i:nth-child(3) { left: 6px; top: 30px; }
+.spread-icon.choice i:nth-child(4) { left: 46px; top: 8px; }
+.spread-icon.choice i:nth-child(5) { left: 46px; top: 30px; }
 .spread-icon.celtic i:nth-child(1) { left: 16px; top: 19px; }
 .spread-icon.celtic i:nth-child(2) { left: 16px; top: 19px; transform: rotate(90deg); border-color: var(--teal); }
 .spread-icon.celtic i:nth-child(3) { left: 16px; top: 38px; }
@@ -635,7 +655,17 @@ button.pcard-wrap.zoomable { cursor: zoom-in; }
 .stage.spread-one { justify-items: center; }
 .stage.spread-one .slot { width: min(56vw, 220px); }
 /* стол на три карты */
-.stage.spread-three { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+.stage.spread-row { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+.stage.spread-row.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+/* отношения: вы — между вами — другой, помеха снизу, куда идёт сверху */
+.stage.spread-love { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: '. p5 .' 'p1 p3 p2' '. p4 .'; gap: 10px; align-items: start; }
+/* выбор: путь А — суть — путь Б, под путями их итоги */
+.stage.spread-choice { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: 'p2 p1 p4' 'p3 . p5'; gap: 10px; align-items: start; }
+.spread-love .p1, .spread-choice .p1 { grid-area: p1; }
+.spread-love .p2, .spread-choice .p2 { grid-area: p2; }
+.spread-love .p3, .spread-choice .p3 { grid-area: p3; }
+.spread-love .p4, .spread-choice .p4 { grid-area: p4; }
+.spread-love .p5, .spread-choice .p5 { grid-area: p5; }
 /* кельтский крест: крест 3×3 слева, посох из четырёх карт справа снизу вверх */
 .stage.spread-celtic { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-areas: '. p5 . p10' 'p4 p1 p6 p9' '. p3 . p8' '. . . p7'; gap: 8px 8px; align-items: center; }
 .spread-celtic .slot { gap: 2px; }
@@ -657,6 +687,24 @@ button.pcard-wrap.zoomable { cursor: zoom-in; }
 @keyframes deal-fade { from { opacity: 0; translate: 0 -12px; } to { opacity: 1; translate: none; } }
 @keyframes deal-fade-cross { from { opacity: 0; } to { opacity: 1; } }
 .spread-next { text-align: center; font-size: var(--px-xs); line-height: 1.8; }
+
+/* подсказка вопросов: темы и готовые вопросы с подходящим раскладом */
+.ask-help { display: grid; gap: 10px; }
+.ask-help .hint { animation: none; color: var(--muted); line-height: 1.9; letter-spacing: .04em; }
+.ask-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ask-q { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 2px; width: 100%; padding: 8px 10px; border-left: 3px solid var(--dim); background: var(--panel);
+  font-family: var(--serif); font-size: 1rem; line-height: 1.35; color: var(--fg); animation: panel-in .3s var(--ease-out) backwards; }
+.ask-q:hover, .ask-q:focus-visible { border-left-color: var(--teal); outline: none; }
+.ask-q.on { border-left-color: var(--teal); background: rgba(63, 179, 163, .1); }
+.ask-kind { font-family: var(--mono); font-size: var(--fs-meta); color: var(--teal); }
+.ask-kind::before { content: '▸ '; }
+
+/* ответ расклада «Да или нет» */
+.verdict { margin: 0 0 10px; font-size: var(--fs-ui); color: var(--muted); }
+.verdict b { font-family: var(--pix); font-size: var(--px-l); line-height: 1.8; letter-spacing: .06em; }
+.verdict.v-yes b, .verdict.v-likely b { color: var(--teal); text-shadow: 0 0 10px rgba(63, 179, 163, .45); }
+.verdict.v-unclear b { color: var(--warn); }
+.verdict.v-unlikely b, .verdict.v-no b { color: var(--bad); text-shadow: 0 0 10px rgba(255, 90, 106, .35); }
 
 /* нижняя панель разделов */
 .app.with-tabs { padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
@@ -688,6 +736,7 @@ button.pcard-wrap.zoomable { cursor: zoom-in; }
 .diary-cards { display: grid; gap: 8px; justify-items: center; }
 .diary-cards.n1 .slot { width: min(46vw, 180px); }
 .diary-cards.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.diary-cards.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .diary-cards.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .diary-cards .slot { gap: 4px; }
 .diary-cards .slot figcaption { min-height: 0; }
@@ -717,8 +766,23 @@ html.soft .reading.damaged { animation: panel-in .42s var(--ease-out) backwards;
 html.soft .boot-eye.open { animation: lids 1.1s steps(1, end) forwards; }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro, .logo-ext, .boot-eye, .spread-option, .m-line, .m-node, .mm-sq, .mm-dot, .zoom, .zoom-card, .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
+  .intro, .logo-ext, .boot-eye, .spread-option, .ask-q, .m-line, .m-node, .mm-sq, .mm-dot, .zoom, .zoom-card, .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
   .wheel { transition: none; }
   .flipped::after, .sweep { display: none; }
   .boot-eye.open { clip-path: inset(10% 0 10% 0); }
 }
+
+/* раздел «Небо»: гороскоп по знаку на день и неделю */
+.reading.horo { border-image-source: var(--frame-teal); }
+.horo h2 { color: var(--teal); }
+.horo .text + .text { margin-top: 10px; }
+.horo-ask { margin: 4px 0 10px; }
+.horo-signs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.horo-sign { all: unset; box-sizing: border-box; cursor: pointer; display: grid; justify-items: center; gap: 2px; padding: 6px 2px; border: 2px solid var(--dim); background: var(--panel); font-size: var(--fs-meta); color: var(--muted); }
+.horo-sign img { width: 40px; height: 40px; image-rendering: pixelated; }
+.horo-sign:hover, .horo-sign:focus-visible, .horo-sign.on { border-color: var(--teal); color: var(--fg); outline: none; }
+.horo-head { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: center; margin-bottom: 10px; }
+.horo-emblem { width: 48px; height: 48px; image-rendering: pixelated; }
+.horo-sky { margin: 0 0 10px; font-size: var(--fs-meta); color: var(--muted); }
+.horo-change { display: block; margin: 8px auto 0; }
+.section-title { margin: 0; }
