@@ -25,15 +25,15 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
       <p className="greet">
         <span className="prompt">&gt;</span> {greeting}
       </p>
-      <div className="logo" aria-label="Нить, нейро-таро">
-        <span className="logo-word" data-text="НИТЬ" aria-hidden="true">
-          НИТЬ
-        </span>
-        <span className="logo-sub" aria-hidden="true">
-          нейро-таро
+      <div className="logo" aria-label="нить.exe">
+        <span className="logo-row" aria-hidden="true">
+          <span className="logo-word" data-text="НИТЬ">
+            НИТЬ
+          </span>
+          <span className="logo-ext">.exe</span>
         </span>
       </div>
-      <p className="lede">Выберите, за какую нить потянуть.</p>
+      <p className="lede tagline">Ответ уже готов. Осталось задать вопрос.</p>
 
       {/* нить: спускается от названия к дверям */}
       <svg className="thread" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true">

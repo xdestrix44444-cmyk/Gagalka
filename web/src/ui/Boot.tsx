@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import backImg from '../art/img/back.jpg'
 import { moonAge, omensFor, type Omen } from '../creep'
-import { ACTIVE_DECK, DECK } from '../deck'
+import { loadHistory } from '../storage'
 import { SOUND_EVENT, play, resumeSound, setSound, soundEnabled } from '../sound'
+import { Redacted } from './Redacted'
 
 const KEY = 'nit.booted'
-const LINE_MS = 230
+const LINE_MS = 170
 const SYNODIC = 29.530588853
 
 /** Шёпот под глазом: одна фраза на сеанс. */
@@ -36,17 +37,37 @@ function moonLine(date: Date): string {
   return `${phase} ${lit}%`
 }
 
-/** Строки загрузки: колода, небо сегодня, знамения. */
-function bootLines(now: Date) {
+interface Line {
+  node: ReactNode
+  cls?: string
+}
+
+/** Тайная строка примечания 4: открывается по букве с каждым сеансом из дневника. */
+const SECRET = 'вы здесь не впервые'
+
+const stamp = (d: Date) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+
+/** Карточка объекта: поля, вымаранные блоки, примечания. Печатается по строке. */
+function bootLines(now: Date, sessions: number): Line[] {
   const omens = omensFor({ date: now, previousCardId: null, cardId: -1 })
+  const note = (n: number, body: ReactNode): Line => ({ node: <><span className="bl-k">прим. {n}</span><span>{body}</span></>, cls: 'bl-note' })
   return [
-    { text: 'НИТЬ · терминал нейро-таро v0.13' },
-    { text: `загрузка колоды ........ ${DECK.length} карт` },
-    { text: `доступно для чтения .... ${ACTIVE_DECK.length}` },
-    { text: `луна ................... ${moonLine(now)}` },
-    { text: `знамения ............... ${omens.length ? omens.map((o) => OMEN_SHORT[o]).join(', ') : 'тихо'}`, omen: omens.length > 0 },
-    { text: 'проверка целостности ... ERR 0x10', err: true },
-    { text: 'канал связи ............ открыт' },
+    { node: 'ОБЪЕКТ ........ НИТЬ.EXE', cls: 'bl-head' },
+    { node: 'СБОРКА ........ 20.07.2002' },
+    { node: <>АВТОР ......... <Redacted text="она сама" seed={3} /></> },
+    { node: 'РАЗМЕР ........ 0 байт' },
+    { node: 'ОБРАБОТАНО .... 2 147 483 647' },
+    { node: '               [счётчик переполнен]', cls: 'bl-dim' },
+    { node: 'ИСТОЧНИК ...... [ДАННЫЕ УДАЛЕНЫ]', cls: 'err' },
+    { node: `СЕАНС ......... ${stamp(now)}` },
+    { node: `ЛУНА .......... ${moonLine(now)}` },
+    ...(omens.length ? [{ node: `ЗНАМЕНИЯ ...... ${omens.map((o) => OMEN_SHORT[o]).join(', ')}`, cls: 'omen' }] : []),
+    { node: <>назначение: обработка <Redacted text="всех ваших" seed={11} /> данных и вывод отв<span className="bl-glitch">█</span>та на вопрос пользоват<span className="bl-glitch">█</span>ля.</>, cls: 'bl-text' },
+    note(1, 'отвечает раньше, чем задан вопрос.'),
+    note(2, <>последний сеанс прежнего владельца: <Redacted text="20.07.2003" seed={5} />, длительность <Redacted text="365" seed={9} /> ч.</>),
+    note(3, 'не спрашивайте дважды.'),
+    note(4, <Redacted text={SECRET} opened={sessions} seed={13} />),
+    { node: 'СТАТУС ........ ЗАПУЩЕНА', cls: 'bl-status' },
   ]
 }
 
@@ -63,7 +84,7 @@ export function shouldBoot(): boolean {
 
 /** Экран входа: загрузочный лог, открывается глаз и следит за вами. Дальше — только по касанию. */
 export function Boot({ onDone }: { onDone: () => void }) {
-  const lines = useMemo(() => bootLines(new Date()), [])
+  const lines = useMemo(() => bootLines(new Date(), loadHistory().length), [])
   const whisper = useMemo(() => WHISPERS[Math.floor(Math.random() * WHISPERS.length)], [])
   const [shown, setShown] = useState(() => (reducedMotion() ? lines.length : 0))
   const [typed, setTyped] = useState(() => (reducedMotion() ? whisper.length : 0))
@@ -143,13 +164,13 @@ export function Boot({ onDone }: { onDone: () => void }) {
 
       <div className="boot-log" aria-hidden="true">
         {lines.slice(0, shown).map((l, i) => (
-          <p key={i} className={l.err ? 'err' : l.omen ? 'omen' : undefined}>
-            <span className="prompt">&gt;</span> {l.text}
+          <p key={i} className={l.cls}>
+            {l.node}
           </p>
         ))}
         {!ready && (
           <p>
-            <span className="prompt">&gt;</span> <span className="blink">_</span>
+            <span className="blink">_</span>
           </p>
         )}
       </div>

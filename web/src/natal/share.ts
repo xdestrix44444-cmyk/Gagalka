@@ -99,7 +99,7 @@ export async function renderShare(chart: Chart, name: string, mainLink: string):
 
   d.fillStyle = '#4a3a33'
   d.font = '22px "Press Start 2P"'
-  d.fillText('нить · нейро-таро', W / 2, H - 140)
+  d.fillText('нить.exe', W / 2, H - 140)
 
   return new Promise((resolve) => c.toBlob((b) => resolve(b!), 'image/png'))
 }

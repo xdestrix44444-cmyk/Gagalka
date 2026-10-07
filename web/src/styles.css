@@ -139,13 +139,26 @@ div.pcard-wrap { cursor: default; }
 .diary .damaged, .diary .damaged .pct { color: var(--bad); }
 
 /* экран входа */
-.boot { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: grid; align-content: safe center; justify-content: center; justify-items: center; gap: 22px; overflow-y: auto;
+.boot { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: grid; grid-auto-rows: max-content; align-content: safe center; justify-content: center; justify-items: center; gap: 22px; overflow-y: auto;
   padding: calc(64px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px)); cursor: pointer; }
 .boot.leaving { animation: boot-out .38s steps(4, end) forwards; }
 @keyframes boot-out { 0% { opacity: 1; filter: none; } 40% { filter: invert(1); } 60% { filter: none; transform: scaleY(.04); } 100% { opacity: 0; transform: scaleY(0); } }
 .boot-log { font-size: var(--fs-meta); color: #b9b2a5; display: grid; gap: 3px; min-height: 9em; width: min(88vw, 360px); }
 .boot-log .err { color: var(--bad); }
 .boot-log .omen { color: var(--warn); }
+/* карточка объекта на экране входа */
+.boot-log p { white-space: pre-wrap; }
+.boot-log .bl-head { color: var(--fg); }
+.boot-log .bl-dim { color: var(--muted); }
+.boot-log .bl-text { margin-top: 8px; }
+.boot-log .bl-note { display: grid; grid-template-columns: 5.2em minmax(0, 1fr); }
+.boot-log .bl-k { color: var(--muted); }
+.boot-log .bl-status { margin-top: 8px; color: var(--teal); text-shadow: 0 0 8px rgba(63, 179, 163, .5); }
+.boot-log .bl-glitch { color: var(--bad); }
+/* вымаранный текст: блоки, изредка просвечивающие буквы, навсегда открытые буквы */
+.rd { color: #7d756a; letter-spacing: -.02em; }
+.rd-flash { color: var(--teal); text-shadow: 0 0 6px rgba(63, 179, 163, .8); }
+.rd-open { color: var(--warn); }
 /* шёпот под глазом */
 .boot-whisper { min-height: 1.6em; font-family: var(--serif); font-style: italic; font-size: 1.08rem; color: var(--muted); text-align: center; text-shadow: 0 0 12px rgba(181, 84, 60, .45); }
 /* звук прямо на экране входа */
@@ -245,7 +258,10 @@ button.pcard-wrap .pcard-flip:not(.flipped) { animation: breathe 2.4s steps(6, e
 .logo-word::after { color: var(--teal); animation: logo-split 5s steps(1, end) infinite reverse; }
 @keyframes logo-glitch { 0%, 88%, 100% { transform: none; } 89% { transform: translate(-3px, 1px) skewX(-8deg); } 91% { transform: translate(2px, 0); } 92% { transform: none; } }
 @keyframes logo-split { 0%, 87%, 94%, 100% { opacity: 0; transform: none; } 88% { opacity: .8; transform: translate(-5px, -2px); clip-path: inset(10% 0 55% 0); } 90% { opacity: .8; transform: translate(4px, 2px); clip-path: inset(50% 0 10% 0); } 92% { opacity: 0; } }
-.logo-sub { font-family: var(--pix); font-size: var(--px-xs); color: var(--teal); letter-spacing: .4em; padding-left: .4em; }
+.logo-row { display: inline-flex; align-items: baseline; gap: 4px; }
+.logo-ext { font-family: var(--pix); font-size: var(--px-s); color: var(--teal); text-shadow: 0 0 8px rgba(63, 179, 163, .6); animation: ext-pulse 1.4s steps(1, end) infinite; }
+@keyframes ext-pulse { 50% { opacity: .35; } }
+.lede.tagline { color: var(--fg); font-size: 1.06rem; }
 .thread { width: 100%; height: 44px; overflow: visible; }
 .thread path { fill: none; stroke: var(--rust); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-dasharray: 4 3; animation: thread-run 1.2s steps(7, end) infinite; filter: drop-shadow(0 0 3px rgba(181, 84, 60, .8)); }
 @keyframes thread-run { to { stroke-dashoffset: -14; } }
@@ -642,7 +658,7 @@ button.pcard-wrap.zoomable { cursor: zoom-in; }
 .spread-next { text-align: center; font-size: var(--px-xs); line-height: 1.8; }
 
 @media (prefers-reduced-motion: reduce) {
-  .boot-eye, .spread-option, .m-line, .m-node, .mm-sq, .mm-dot, .zoom, .zoom-card, .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
+  .logo-ext, .boot-eye, .spread-option, .m-line, .m-node, .mm-sq, .mm-dot, .zoom, .zoom-card, .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
   .wheel { transition: none; }
   .flipped::after, .sweep { display: none; }
   .boot-eye.open { clip-path: inset(10% 0 10% 0); }
