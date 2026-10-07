@@ -160,17 +160,23 @@ function steady(freq: number, dur: number, vol: number, type: OscillatorType = '
   o.stop(t + dur + 0.02)
 }
 
-/** Дозвон модема — запись (src/sounds/modem.mp3), а не синтез. Файл скачивается и декодируется один раз. */
+/** Дозвон модема — запись (src/sounds/modem.mp3), а не синтез. Файл скачивается при запуске и декодируется один раз. */
+let modemBytes: Promise<ArrayBuffer | null> | null = null
 let modemBuf: Promise<AudioBuffer | null> | null = null
+
+/** Начать загрузку записей заранее: декодировать их можно только с аудиоконтекстом, а он появляется после касания. */
+export function preloadSounds() {
+  modemBytes ??= fetch(modemUrl)
+    .then((r) => r.arrayBuffer())
+    .catch(() => null)
+}
 
 function modem() {
   const a = audio()
   if (!a) return
   const { ctx: c, out } = a
-  modemBuf ??= fetch(modemUrl)
-    .then((r) => r.arrayBuffer())
-    .then((b) => c.decodeAudioData(b))
-    .catch(() => null)
+  preloadSounds()
+  modemBuf ??= modemBytes!.then((b) => (b ? c.decodeAudioData(b) : null)).catch(() => null)
   void modemBuf.then((buf) => {
     if (!buf) return
     const src = c.createBufferSource()

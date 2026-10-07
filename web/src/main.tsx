@@ -11,16 +11,20 @@ import '@fontsource/pt-serif/700.css'
 import './styles.css'
 import { applySettings } from './settings'
 import { installFrames } from './ui/frames'
-import { installUiSounds } from './sound'
-import { watchForUpdates } from './update'
+import { installUiSounds, preloadSounds } from './sound'
+import { updateBeforeStart } from './update'
 
-installFrames()
-applySettings()
-installUiSounds()
-watchForUpdates()
+// запись модема качается сразу, пока идёт экран входа: к входу в меню она уже готова
+preloadSounds()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+void updateBeforeStart().then((reloading) => {
+  if (reloading) return
+  installFrames()
+  applySettings()
+  installUiSounds()
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+})
