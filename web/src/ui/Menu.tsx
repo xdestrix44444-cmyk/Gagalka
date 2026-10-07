@@ -13,7 +13,7 @@ const MODEM_KEY = 'nit.modem'
 export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Door) => void }) {
   const [diving, setDiving] = useState<Door | null>(null)
 
-  // при первом входе в меню за сеанс — короткий дозвон модема, будто программа выходит на связь
+  // при первом входе в меню за сеанс — дозвон модема, будто программа выходит на связь
   useEffect(() => {
     try {
       if (sessionStorage.getItem(MODEM_KEY)) return

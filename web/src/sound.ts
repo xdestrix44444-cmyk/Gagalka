@@ -1,7 +1,8 @@
-// Звук «Нити»: всё синтезируется Web Audio, без файлов. По умолчанию включён (до первого касания браузер молчит), выключается кнопкой ♪.
+// Звук «Нити»: синтезируется Web Audio; из файла только дозвон модема. По умолчанию включён (до первого касания браузер молчит), выключается кнопкой ♪.
 // Браузеры разрешают звук только после жеста пользователя, поэтому контекст создаётся при включении.
 
 import { SETTINGS_EVENT, loadSettings } from './settings'
+import modemUrl from './sounds/modem.mp3'
 
 const KEY = 'nit.sound.v1'
 
@@ -139,7 +140,7 @@ function tone(freq: number, dur: number, vol: number, type: OscillatorType = 'sq
   o.stop(t + dur + 0.02)
 }
 
-/** Ровный тон с мягкой атакой и затуханием: гудки, тоны модема. */
+/** Ровный тон с мягкой атакой и затуханием. */
 function steady(freq: number, dur: number, vol: number, type: OscillatorType = 'sine', at = 0) {
   const a = audio()
   if (!a) return
@@ -158,25 +159,27 @@ function steady(freq: number, dur: number, vol: number, type: OscillatorType = '
   o.stop(t + dur + 0.02)
 }
 
-/** Короткий отрывок дозвона по телефонной линии: гудок, набор, ответ, визг рукопожатия. Около 2 секунд. */
+/** Дозвон модема — запись (src/sounds/modem.mp3), а не синтез. Файл скачивается и декодируется один раз. */
+let modemBuf: Promise<AudioBuffer | null> | null = null
+
 function modem() {
-  // гудок линии
-  steady(350, 0.28, 0.03)
-  steady(440, 0.28, 0.03)
-  // набор номера: пары частот DTMF
-  const digits: [number, number][] = [[697, 1209], [770, 1336], [852, 1477], [941, 1336], [697, 1477], [852, 1209]]
-  digits.forEach(([lo, hi], i) => {
-    const at = 0.34 + i * 0.09
-    steady(lo, 0.06, 0.035, 'sine', at)
-    steady(hi, 0.06, 0.035, 'sine', at)
+  const a = audio()
+  if (!a) return
+  const { ctx: c, out } = a
+  modemBuf ??= fetch(modemUrl)
+    .then((r) => r.arrayBuffer())
+    .then((b) => c.decodeAudioData(b))
+    .catch(() => null)
+  void modemBuf.then((buf) => {
+    if (!buf) return
+    const src = c.createBufferSource()
+    src.buffer = buf
+    const g = c.createGain()
+    // запись громче синтезированных звуков: приглушаем, чтобы не оглушала
+    g.gain.value = 0.5
+    src.connect(g).connect(out)
+    src.start()
   })
-  // ответный тон
-  steady(2100, 0.32, 0.03, 'sine', 0.95)
-  // рукопожатие: быстрое переключение частот и шипение
-  for (let i = 0; i < 26; i++) steady(Math.random() < 0.5 ? 1200 : 2200, 0.018, 0.022, 'square', 1.3 + i * 0.018)
-  burst(1800, 0.7, 0.45, 0.06, 1.3)
-  for (let i = 0; i < 8; i++) steady(980 + Math.random() * 700, 0.04, 0.025, 'sawtooth', 1.78 + i * 0.03)
-  burst(3000, 2, 0.12, 0.05, 2.0)
 }
 
 export type Sfx = 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type' | 'glitch' | 'lag' | 'modem' | 'blink'
