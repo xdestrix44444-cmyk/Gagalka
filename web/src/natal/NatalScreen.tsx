@@ -13,6 +13,7 @@ import { planetEmblem, signEmblem } from './emblems'
 import { chartOf, cityOf, deletePerson, fmtDate, hasBirthplace, loadPeople, savePerson, type Person } from './people'
 import { ImportPerson, SendToFriend } from './ShareCode'
 import { skyToday } from './relations'
+import { STORIES_ENABLED } from '../ui/ShareReading'
 import { renderShare, shareImage } from './share'
 import { SynastryView } from './Synastry'
 import { tourSteps } from './tour'
@@ -492,9 +493,11 @@ function NatalChart({ person, onBack, onEdit, onDelete }: { person: Person; onBa
           >
             экскурсия по карте
           </button>
-          <button type="button" onClick={share} disabled={sharing}>
-            {sharing ? 'рисую…' : 'поделиться'}
-          </button>
+          {STORIES_ENABLED && (
+            <button type="button" onClick={share} disabled={sharing}>
+              {sharing ? 'рисую…' : 'поделиться'}
+            </button>
+          )}
         </div>
       )}
       {sky && (
