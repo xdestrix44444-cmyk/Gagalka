@@ -176,10 +176,29 @@ function modem() {
     src.buffer = buf
     const g = c.createGain()
     // запись громче синтезированных звуков: приглушаем, чтобы не оглушала
-    g.gain.value = 0.5
+    const vol = 0.5
+    const t = c.currentTime
+    const end = t + buf.duration
+    // запись обрывается посреди шипения — гасим хвост и на затухании «включаемся»
+    g.gain.setValueAtTime(vol, t)
+    g.gain.setValueAtTime(vol, end - FADE)
+    g.gain.linearRampToValueAtTime(0, end)
     src.connect(g).connect(out)
-    src.start()
+    src.start(t)
+    online(buf.duration - FADE * 0.6)
   })
+}
+
+/** Затухание конца записи модема, секунды. */
+const FADE = 0.5
+
+/** Связь установлена: щелчок реле, нарастающий гул кинескопа и два тихих тона. */
+function online(at: number) {
+  burst(4200, 3, 0.03, 0.12, at)
+  tone(70, 0.5, 0.05, 'sawtooth', at + 0.02, 140)
+  burst(2600, 1.2, 0.25, 0.03, at + 0.05)
+  steady(660, 0.16, 0.035, 'triangle', at + 0.38)
+  steady(990, 0.42, 0.03, 'triangle', at + 0.54)
 }
 
 export type Sfx = 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type' | 'glitch' | 'lag' | 'modem' | 'blink'
