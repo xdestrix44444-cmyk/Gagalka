@@ -44,6 +44,16 @@ function loadImage(src: string) {
   return p
 }
 
+/**
+ * Загружает рубашку и рисунки нужных карт, чтобы звук тасования и раздача не обгоняли картинки.
+ * На медленной сети ждём не дольше timeoutMs: дальше карты дорисуются, когда придут.
+ */
+export function preloadCards(ids: readonly number[], timeoutMs = 4000): Promise<void> {
+  const srcs = [backImg, ...ids.flatMap((id) => (ART[id] ? [ART[id]] : []))]
+  const all = Promise.all(srcs.map((src) => loadImage(src).catch(() => undefined))).then(() => undefined)
+  return Promise.race([all, new Promise<void>((resolve) => setTimeout(resolve, timeoutMs))])
+}
+
 /** Последний заказанный рисунок для каждого холста: старая загрузка не перерисует новую карту. */
 const pending = new WeakMap<HTMLCanvasElement, number>()
 let ticket = 0

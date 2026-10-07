@@ -7,6 +7,7 @@ import { QUESTION_MAX } from './reading-request'
 import { QUESTION_TOPICS, SPREADS, SPREAD_GROUPS, type SpreadKind } from './spreads'
 import { VERDICT_LABEL, VERDICT_NOTE, verdictOf } from './yesno'
 import { FLIP_MS, PixelCard, ShuffleDeck } from './PixelCard'
+import { preloadCards } from './sprites'
 import { MatrixScreen } from './matrix/MatrixScreen'
 import { NatalScreen } from './natal/NatalScreen'
 import { Reading, ReadingText } from './Reading'
@@ -32,6 +33,8 @@ const SHUFFLE_MS = 1100
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 const tg = initTelegram()
+// рубашка нужна почти сразу: на столе и при тасовании
+void preloadCards([])
 
 /** Целостность карты в этот раз и знамения, которые на неё влияли; предыдущей считается последняя карта дневника. */
 function rollFor(cardId: number, previousCardId: number | null): { integrity: number; omens: Omen[] } {
@@ -165,22 +168,27 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
   const [shuffling, setShuffling] = useState(false)
   const [justRevealed, setJustRevealed] = useState(false)
 
-  const reveal = () => {
-    if (cardId !== null || shuffling) return
+  // карта вытягивается сразу, но тасование со звуком начинается, когда загружены рубашка и её рисунок
+  const [loading, setLoading] = useState(false)
+  const reveal = async () => {
+    if (cardId !== null || shuffling || loading) return
     haptic()
-    if (prefersReducedMotion()) return pick()
+    const [card] = drawCards(1)
+    setLoading(true)
+    await preloadCards([card.id])
+    setLoading(false)
+    if (prefersReducedMotion()) return pick(card)
     play('shuffle')
     setShuffling(true)
     const pulses = [SHUFFLE_MS / 3, (SHUFFLE_MS * 2) / 3].map((t) => setTimeout(() => haptic(), t))
     setTimeout(() => {
       pulses.forEach(clearTimeout)
       setShuffling(false)
-      pick()
+      pick(card)
     }, SHUFFLE_MS)
   }
 
-  const pick = () => {
-    const [card] = drawCards(1)
+  const pick = (card: (typeof DECK)[number]) => {
     const { integrity, omens } = rollFor(card.id, lastCardId())
     revealFx(integrity)
     const h = saveHistoryEntry({ kind: 'day', cards: [card.id], integrity: [integrity] })
@@ -223,8 +231,8 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
           />
         )}
         {!card &&
-          (shuffling ? (
-            <p className="hint">тасую колоду…</p>
+          (shuffling || loading ? (
+            <p className="hint">{loading ? 'достаю колоду…' : 'тасую колоду…'}</p>
           ) : (
             <button type="button" className="btn primary cta" onClick={reveal}>
               Открыть карту дня
@@ -258,7 +266,6 @@ function Spread({ onBack }: { onBack: () => void }) {
   const pickRef = useRef<HTMLDivElement>(null)
 
   const start = (k: SpreadKind) => {
-    play('shuffle')
     haptic()
     setRound((r) => r + 1)
     setKind(k)
@@ -375,6 +382,19 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
     return { drawn, integrity: rolls.map((r) => r.integrity), omens: rolls.map((r) => r.omens) }
   })
   const { drawn: cards, integrity, omens } = dealt
+  // карты раздаются (и звучит тасование), только когда загружены рубашка и рисунки этих карт
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    let alive = true
+    preloadCards(cards.map((c) => c.id)).then(() => {
+      if (!alive) return
+      play('shuffle')
+      setReady(true)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
   const [open, setOpen] = useState<boolean[]>(() => positions.map(() => false))
   const allOpen = open.every(Boolean)
   // карты открываются по порядку позиций
@@ -407,8 +427,9 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
     <section className="screen">
       <ScreenHead title={spread.name} onBack={onBack} />
       {question ? <p className="asked">«{question}»</p> : <p className="lede">{single ? 'Откройте карту.' : 'Откройте карты по порядку.'}</p>}
+      {!ready && <p className="hint spread-wait">достаю колоду…</p>}
       <div className={`stage spread-${spread.layout} n${cards.length}`}>
-        {cards.map((c, i) => (
+        {ready && cards.map((c, i) => (
           <figure
             key={i}
             className={`slot deal p${i + 1}${i === next ? ' next' : ''}${!open[i] && i !== next ? ' wait' : ''}`}
@@ -427,7 +448,7 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
           </figure>
         ))}
       </div>
-      {many && next >= 0 && (
+      {ready && many && next >= 0 && (
         <p className="hint spread-next">
           ▸ {next + 1} · {positions[next]}: {spread.positions[next].hint}
         </p>

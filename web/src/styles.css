@@ -4,7 +4,7 @@
   --bg: #060608;
   --panel: rgba(9, 9, 12, 0.94);
   --fg: #d9d2c3;
-  --muted: #8a8378;
+  --muted: #aca495;
   --dim: #4a3a33;
   --rust: #b5543c;
   --teal: #3fb3a3;
@@ -124,7 +124,7 @@ div.pcard-wrap { cursor: default; }
 /* вопрос к нити */
 .question { display: grid; gap: 6px; font-size: var(--fs-ui); color: var(--muted); }
 .question textarea { font-family: var(--serif); font-size: 1.02rem; color: var(--fg); padding: 2px 4px; resize: vertical; border-radius: 0; caret-color: var(--teal); }
-.question textarea::placeholder { color: #5f5a52; font-style: italic; }
+.question textarea::placeholder { color: #857e72; font-style: italic; }
 .question textarea:focus-visible { outline: none; border-image-source: var(--frame-teal); }
 .asked { font-family: var(--serif); font-style: italic; text-align: center; color: var(--fg); }
 
@@ -686,6 +686,7 @@ button.pcard-wrap.zoomable { cursor: zoom-in; }
 .spread-celtic .p2.deal { animation-name: deal-fade-cross; }
 @keyframes deal-fade { from { opacity: 0; translate: 0 -12px; } to { opacity: 1; translate: none; } }
 @keyframes deal-fade-cross { from { opacity: 0; } to { opacity: 1; } }
+.spread-wait { text-align: center; margin: 40px 0; }
 .spread-next { text-align: center; font-size: var(--px-xs); line-height: 1.8; }
 
 /* подсказка вопросов: темы и готовые вопросы с подходящим раскладом */
