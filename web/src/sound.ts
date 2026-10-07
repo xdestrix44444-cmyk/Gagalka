@@ -134,7 +134,47 @@ function tone(freq: number, dur: number, vol: number, type: OscillatorType = 'sq
   o.stop(t + dur + 0.02)
 }
 
-export type Sfx = 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type'
+/** Ровный тон с мягкой атакой и затуханием: гудки, тоны модема. */
+function steady(freq: number, dur: number, vol: number, type: OscillatorType = 'sine', at = 0) {
+  const a = audio()
+  if (!a) return
+  const { ctx: c, out } = a
+  const t = c.currentTime + at
+  const o = c.createOscillator()
+  o.type = type
+  o.frequency.setValueAtTime(freq, t)
+  const g = c.createGain()
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(vol, t + 0.008)
+  g.gain.setValueAtTime(vol, t + Math.max(0.01, dur - 0.012))
+  g.gain.linearRampToValueAtTime(0, t + dur)
+  o.connect(g).connect(out)
+  o.start(t)
+  o.stop(t + dur + 0.02)
+}
+
+/** Короткий отрывок дозвона по телефонной линии: гудок, набор, ответ, визг рукопожатия. Около 2 секунд. */
+function modem() {
+  // гудок линии
+  steady(350, 0.28, 0.03)
+  steady(440, 0.28, 0.03)
+  // набор номера: пары частот DTMF
+  const digits: [number, number][] = [[697, 1209], [770, 1336], [852, 1477], [941, 1336], [697, 1477], [852, 1209]]
+  digits.forEach(([lo, hi], i) => {
+    const at = 0.34 + i * 0.09
+    steady(lo, 0.06, 0.035, 'sine', at)
+    steady(hi, 0.06, 0.035, 'sine', at)
+  })
+  // ответный тон
+  steady(2100, 0.32, 0.03, 'sine', 0.95)
+  // рукопожатие: быстрое переключение частот и шипение
+  for (let i = 0; i < 26; i++) steady(Math.random() < 0.5 ? 1200 : 2200, 0.018, 0.022, 'square', 1.3 + i * 0.018)
+  burst(1800, 0.7, 0.45, 0.06, 1.3)
+  for (let i = 0; i < 8; i++) steady(980 + Math.random() * 700, 0.04, 0.025, 'sawtooth', 1.78 + i * 0.03)
+  burst(3000, 2, 0.12, 0.05, 2.0)
+}
+
+export type Sfx = 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type' | 'glitch' | 'lag' | 'modem' | 'blink'
 
 export function play(sfx: Sfx) {
   if (!soundEnabled()) return
@@ -162,6 +202,22 @@ export function play(sfx: Sfx) {
     case 'boot':
       tone(110, 0.6, 0.06, 'sawtooth', 0, 220)
       tone(1760, 0.08, 0.04, 'square', 0.65)
+      break
+    case 'glitch':
+      // буквы проступают: несколько цифровых писков и щелчок
+      for (let i = 0; i < 4; i++) steady(900 + Math.random() * 3200, 0.014, 0.03, 'square', i * 0.016)
+      burst(5200, 4, 0.03, 0.05)
+      break
+    case 'lag':
+      // буквы гаснут: заикающийся гул, будто картинка подвисла
+      for (let i = 0; i < 3; i++) steady(55 + i * 6, 0.025, 0.05, 'square', i * 0.04)
+      burst(600, 1.5, 0.06, 0.04, 0.02)
+      break
+    case 'blink':
+      burst(900, 2, 0.05, 0.05)
+      break
+    case 'modem':
+      modem()
       break
   }
 }

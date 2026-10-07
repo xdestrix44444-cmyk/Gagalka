@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { play } from '../sound'
 
 // Вымаранный текст: под блоками ████ лежат настоящие буквы. Изредка одна-две из них
 // просвечивают на мгновение; часть может быть открыта насовсем (opened — сколько букв).
@@ -25,15 +26,17 @@ export function Redacted({ text, opened = 0, seed = 7 }: { text: string; opened?
     if (reducedMotion()) return
     let t: ReturnType<typeof setTimeout>
     const tick = () => {
-      // раз в 3–9 секунд просвечивают одна-две случайные буквы
+      // раз в 4–12 секунд просвечивают одна-две случайные буквы: глитч, потом подвисание
       t = setTimeout(() => {
         const k = 1 + Math.floor(Math.random() * 2)
         setFlash(Array.from({ length: k }, () => Math.floor(Math.random() * text.length)))
+        play('glitch')
         t = setTimeout(() => {
           setFlash([])
+          play('lag')
           tick()
-        }, 140)
-      }, 3000 + Math.random() * 6000)
+        }, 160)
+      }, 4000 + Math.random() * 8000)
     }
     tick()
     return () => clearTimeout(t)

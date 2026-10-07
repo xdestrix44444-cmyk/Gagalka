@@ -120,6 +120,20 @@ export function Boot({ onDone }: { onDone: () => void }) {
     return () => clearTimeout(t)
   }, [shown])
 
+  // моргание глаза со звуком: совпадает с анимацией eye-blink (задержка 2,6 с, цикл 7 с, веки смыкаются на 62%)
+  useEffect(() => {
+    if (!ready || reducedMotion()) return
+    let iv: ReturnType<typeof setInterval>
+    const first = setTimeout(() => {
+      play('blink')
+      iv = setInterval(() => play('blink'), 7000)
+    }, 2600 + 7000 * 0.62)
+    return () => {
+      clearTimeout(first)
+      clearInterval(iv)
+    }
+  }, [ready])
+
   // шёпот допечатывается по букве, когда глаз уже открыт
   useEffect(() => {
     if (!ready || typed >= whisper.length) return

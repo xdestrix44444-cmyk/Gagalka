@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import backImg from '../art/img/back.jpg'
 import { PLANETS, SIGN_GLYPHS } from '../natal/chart'
 import { play } from '../sound'
@@ -7,10 +7,22 @@ export type Door = 'tarot' | 'natal' | 'matrix'
 
 /** Сколько длится «провал» в выбранную дверь, мс; совпадает с .door.dive в styles.css. */
 const DIVE_MS = 650
+const MODEM_KEY = 'nit.modem'
 
 /** Меню входа: три двери строками — таро, натальная карта и матрица судьбы. Выбранная дверь затягивает экран внутрь. */
 export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Door) => void }) {
   const [diving, setDiving] = useState<Door | null>(null)
+
+  // при первом входе в меню за сеанс — короткий дозвон модема, будто программа выходит на связь
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(MODEM_KEY)) return
+      sessionStorage.setItem(MODEM_KEY, '1')
+    } catch {
+      return
+    }
+    play('modem')
+  }, [])
 
   const enter = (d: Door) => {
     if (diving) return
