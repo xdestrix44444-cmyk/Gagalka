@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import backImg from '../art/img/back.jpg'
 import { moonAge, omensFor, type Omen } from '../creep'
+import { loadPeople } from '../natal/people'
 import { loadSettings } from '../settings'
 import { loadHistory } from '../storage'
 import { SOUND_EVENT, play, resumeSound, setSound, soundEnabled } from '../sound'
@@ -46,15 +47,24 @@ interface Line {
 /** Тайная строка примечания 4: открывается по букве с каждым сеансом из дневника. */
 const SECRET = 'вы здесь не впервые'
 
+/** Дата сборки — день рождения того, кто открыл программу (из «своей» карты), ДД.ММ.ГГГГ. */
+function buildDate(): string | null {
+  const d = loadPeople().find((p) => p.self)?.date
+  if (!d) return null
+  const [y, m, day] = d.split('-')
+  return `${day}.${m}.${y}`
+}
+
 const stamp = (d: Date) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
 /** Карточка объекта: поля, вымаранные блоки, примечания. Печатается по строке. */
-function bootLines(now: Date, sessions: number): Line[] {
+function bootLines(now: Date, sessions: number, build: string | null): Line[] {
   const omens = omensFor({ date: now, previousCardId: null, cardId: -1 })
   const note = (n: number, body: ReactNode): Line => ({ node: <><span className="bl-k">прим. {n}</span><span>{body}</span></>, cls: 'bl-note' })
   return [
     { node: 'ОБЪЕКТ ........ НИТЬ.EXE', cls: 'bl-head' },
-    { node: 'СБОРКА ........ 20.07.2002' },
+    // своя дата неизвестна — видны только две последние цифры, остальное вымарано и сбоит
+    { node: build ? `СБОРКА ........ ${build}` : <>СБОРКА ........ <Redacted text="??.??.20" seed={17} />02</> },
     { node: <>АВТОР ......... <Redacted text="она сама" seed={3} /></> },
     { node: 'РАЗМЕР ........ 0 байт' },
     { node: 'ОБРАБОТАНО .... 2 147 483 647' },
@@ -85,7 +95,7 @@ export function shouldBoot(): boolean {
 
 /** Экран входа: загрузочный лог, открывается глаз и следит за вами. Дальше — только по касанию. */
 export function Boot({ onDone }: { onDone: () => void }) {
-  const lines = useMemo(() => bootLines(new Date(), loadHistory().length), [])
+  const lines = useMemo(() => bootLines(new Date(), loadHistory().length, buildDate()), [])
   const whisper = useMemo(() => WHISPERS[Math.floor(Math.random() * WHISPERS.length)], [])
   const [shown, setShown] = useState(() => (reducedMotion() ? lines.length : 0))
   const [typed, setTyped] = useState(() => (reducedMotion() ? whisper.length : 0))
