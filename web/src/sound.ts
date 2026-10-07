@@ -3,6 +3,7 @@
 
 import { SETTINGS_EVENT, loadSettings } from './settings'
 import modemUrl from './sounds/modem.mp3'
+import { haptic } from './telegram'
 
 const KEY = 'nit.sound.v1'
 
@@ -192,16 +193,22 @@ function modem() {
 /** Затухание конца записи модема, секунды. */
 const FADE = 0.5
 
-/** Связь установлена: щелчок реле, нарастающий гул кинескопа и два тихих тона. */
+/** Связь установлена: щелчок реле, нарастающий гул кинескопа и два тона.
+ *  Громкость под запись, а частоты не ниже 180 Гц: динамик телефона басы не играет. */
 function online(at: number) {
-  burst(4200, 3, 0.03, 0.12, at)
-  tone(70, 0.5, 0.05, 'sawtooth', at + 0.02, 140)
-  burst(2600, 1.2, 0.25, 0.03, at + 0.05)
-  steady(660, 0.16, 0.035, 'triangle', at + 0.38)
-  steady(990, 0.42, 0.03, 'triangle', at + 0.54)
+  burst(4200, 3, 0.04, 0.25, at)
+  tone(180, 0.5, 0.09, 'sawtooth', at + 0.02, 520)
+  burst(2600, 1.2, 0.3, 0.07, at + 0.05)
+  steady(660, 0.16, 0.09, 'triangle', at + 0.38)
+  steady(990, 0.45, 0.08, 'triangle', at + 0.54)
 }
 
-export type Sfx = 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type' | 'glitch' | 'lag' | 'modem' | 'blink'
+export type Sfx =
+  | 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type' | 'glitch' | 'lag' | 'modem' | 'blink'
+  | 'press' | 'key' | 'back' | 'screen' | 'think' | 'done' | 'deny'
+
+/** Случайный разброс высоты, чтобы частые звуки не звучали как одна и та же запись. */
+const jitter = (f: number, spread = 0.06) => f * (1 + (Math.random() * 2 - 1) * spread)
 
 /** Жуткие звуки, которые в мягком режиме заменяются спокойными или молчат. */
 const HARSH: Partial<Record<Sfx, Sfx | null>> = { corrupt: 'flip', glitch: null, lag: null, static: null }
@@ -215,7 +222,36 @@ export function play(sfx: Sfx) {
   }
   switch (sfx) {
     case 'tap':
-      tone(880, 0.04, 0.05)
+      tone(jitter(880), 0.04, 0.05)
+      break
+    case 'press':
+      // палец лёг на кнопку: сухой щелчок клавиши
+      burst(jitter(2400, 0.15), 2, 0.018, 0.09)
+      tone(jitter(160), 0.03, 0.04, 'triangle')
+      break
+    case 'key':
+      burst(jitter(3600, 0.2), 5, 0.015, 0.06)
+      break
+    case 'back':
+      tone(jitter(660), 0.07, 0.045, 'square', 0, 330)
+      break
+    case 'screen':
+      // экран прогрузился: глухой удар, развёртка шумом и короткий писк кадра
+      tone(140, 0.18, 0.07, 'triangle', 0, 70)
+      burst(1500, 0.8, 0.16, 0.05, 0.02)
+      steady(jitter(1320, 0.03), 0.03, 0.025, 'square', 0.12)
+      break
+    case 'think':
+      // идёт чтение: щелчки головки диска
+      for (let i = 0; i < 3; i++) burst(jitter(3000, 0.3), 4, 0.012, 0.045, i * (0.05 + Math.random() * 0.05))
+      break
+    case 'done':
+      steady(784, 0.08, 0.04, 'triangle')
+      steady(1175, 0.2, 0.035, 'triangle', 0.09)
+      break
+    case 'deny':
+      steady(110, 0.09, 0.05, 'square')
+      steady(104, 0.09, 0.05, 'square', 0.1)
       break
     case 'type':
       burst(3200, 6, 0.02, 0.05)
@@ -255,4 +291,32 @@ export function play(sfx: Sfx) {
       modem()
       break
   }
+}
+
+/** Что считается нажимаемым: кнопки, ссылки, поля и элементы круга натальной карты. */
+const PRESSABLE = 'button, a[href], [role="button"], label, select, summary, input[type="checkbox"], input[type="radio"], input[type="range"], .w-house, .w-planet, .w-point, .w-over-planet'
+
+/** Отклик на любое нажатие и на ввод текста — один раз на всё приложение, без правок в каждой кнопке.
+ *  Подтверждающие звуки (tap, flip…) остаются у самих кнопок и звучат при отпускании. */
+export function installUiSounds() {
+  document.addEventListener(
+    'pointerdown',
+    (e) => {
+      const el = (e.target as Element | null)?.closest?.(PRESSABLE)
+      if (!el) return
+      const off = el.matches(':disabled, [aria-disabled="true"]')
+      play(off ? 'deny' : 'press')
+      haptic(off ? 'error' : 'light')
+    },
+    { capture: true, passive: true },
+  )
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      const t = e.target as Element | null
+      if (e.repeat || !t?.matches?.('input, textarea')) return
+      if (e.key.length === 1 || e.key === 'Backspace') play('key')
+    },
+    { capture: true, passive: true },
+  )
 }

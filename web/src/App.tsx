@@ -69,6 +69,7 @@ export function App() {
     }, 180)
   }
   const show = (s: Screen) => {
+    play('screen')
     setScreen(s)
     window.scrollTo({ top: 0 })
   }

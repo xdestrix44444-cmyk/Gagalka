@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ReadingRequest } from './reading-request'
+import { play } from './sound'
 
 /**
  * Запрашивает толкование у сервера и отдаёт текст по мере генерации.
@@ -74,6 +75,22 @@ export function AiText({ request, fallback, saved, delay = 0, onDone }: Props) {
     }
     // запрос определяется своим содержимым (key), а не ссылкой на объект
   }, [key, saved])
+
+  // звук чтения: пока ждём — щелчки диска, пока текст идёт — стук клавиш, в конце — короткий отбой
+  const lastKey = useRef(0)
+  useEffect(() => {
+    if (saved || state.status !== 'loading') return
+    const iv = setInterval(() => play('think'), 650)
+    return () => clearInterval(iv)
+  }, [saved, state.status])
+  useEffect(() => {
+    if (saved) return
+    if (state.status === 'done') play('done')
+    else if (state.status === 'streaming' && performance.now() - lastKey.current > 90) {
+      lastKey.current = performance.now()
+      play('key')
+    }
+  }, [saved, state])
 
   if (state.status === 'failed') return <>{fallback}</>
   if (state.status === 'loading')

@@ -11,9 +11,13 @@ import '@fontsource/pt-serif/700.css'
 import './styles.css'
 import { applySettings } from './settings'
 import { installFrames } from './ui/frames'
+import { installUiSounds } from './sound'
+import { watchForUpdates } from './update'
 
 installFrames()
 applySettings()
+installUiSounds()
+watchForUpdates()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

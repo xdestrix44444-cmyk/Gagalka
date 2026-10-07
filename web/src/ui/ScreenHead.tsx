@@ -15,7 +15,7 @@ export function ScreenHead({ title, onBack }: { title: string; onBack?: () => vo
     const b = tgBack()
     if (!b || !hasBack) return
     const h = () => {
-      play('tap')
+      play('back')
       back.current?.()
     }
     b.onClick(h)
@@ -33,7 +33,7 @@ export function ScreenHead({ title, onBack }: { title: string; onBack?: () => vo
           type="button"
           className="nav-back"
           onClick={() => {
-            play('tap')
+            play('back')
             onBack()
           }}
         >
