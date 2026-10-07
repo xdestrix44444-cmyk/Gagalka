@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { SOUND_EVENT, play, setSound, soundEnabled } from '../sound'
 
 /** Строка статуса сеанса: имя, номер сеанса, «связь» и переключатель звука. */
-export function StatusBar({ onHome }: { onHome: () => void }) {
+export function StatusBar({ onHome, onSettings }: { onHome: () => void; onSettings: () => void }) {
   const session = useMemo(() => `0x${Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0')}`, [])
   const [sound, setSoundState] = useState(soundEnabled)
   useEffect(() => {
@@ -38,6 +38,17 @@ export function StatusBar({ onHome }: { onHome: () => void }) {
         }}
       >
         ♪
+      </button>
+      <button
+        type="button"
+        className="sound gear"
+        aria-label="Настройки"
+        onClick={() => {
+          play('tap')
+          onSettings()
+        }}
+      >
+        ⚙
       </button>
     </header>
   )

@@ -658,8 +658,66 @@ button.pcard-wrap.zoomable { cursor: zoom-in; }
 @keyframes deal-fade-cross { from { opacity: 0; } to { opacity: 1; } }
 .spread-next { text-align: center; font-size: var(--px-xs); line-height: 1.8; }
 
+/* нижняя панель разделов */
+.app.with-tabs { padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(3, 1fr); max-width: 480px; margin: 0 auto;
+  padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px)); background: rgba(6, 6, 8, .96); border-top: 3px solid var(--dim); }
+.tab { all: unset; box-sizing: border-box; display: grid; justify-items: center; gap: 4px; padding: 6px 0; cursor: pointer; color: var(--muted); }
+.tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.4; }
+.tab svg .dot { fill: currentColor; stroke: none; }
+.tab span { font-family: var(--pix); font-size: var(--px-xs); line-height: 1.4; }
+.tab.on { color: var(--teal); text-shadow: 0 0 8px rgba(63, 179, 163, .5); }
+.tab.on svg { filter: drop-shadow(0 0 4px rgba(63, 179, 163, .7)); }
+.tab:focus-visible { outline: 3px solid var(--teal); outline-offset: -3px; }
+.status .gear { font-size: 1.05rem; }
+
+/* таймер до новой карты дня */
+.next-day { text-align: center; font-size: var(--fs-meta); color: var(--muted); }
+.next-day b { font-weight: 400; color: var(--teal); font-variant-numeric: tabular-nums; }
+
+/* дневник: записи открываются */
+.diary li { padding: 0; }
+.diary-row { all: unset; box-sizing: border-box; display: grid; gap: 3px; width: 100%; padding: 4px 8px; cursor: pointer; }
+.diary-row:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+.diary li:hover { border-image-source: var(--frame-teal); }
+.diary .q { font-family: var(--serif); font-style: italic; color: var(--muted); font-size: .98rem; }
+.diary .mark { color: var(--muted); }
+.diary .mark.yes { color: var(--teal); }
+.diary .mark.partly { color: var(--warn); }
+.diary .mark.no { color: var(--bad); }
+.diary-cards { display: grid; gap: 8px; justify-items: center; }
+.diary-cards.n1 .slot { width: min(46vw, 180px); }
+.diary-cards.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.diary-cards.n5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.diary-cards .slot { gap: 4px; }
+.diary-cards .slot figcaption { min-height: 0; }
+.diary-own { display: grid; gap: 12px; }
+
+/* настройки */
+.settings-block { display: grid; gap: 10px; }
+.range { display: grid; gap: 6px; font-size: var(--fs-ui); color: var(--muted); }
+.range input { width: 100%; accent-color: var(--teal); }
+.range input:disabled { opacity: .4; }
+.btn.danger { color: var(--bad); border-image-source: var(--frame-rust); }
+
+/* вступление при первом запуске */
+.intro { position: fixed; inset: 0; z-index: 55; display: grid; align-items: end; justify-items: center; padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, rgba(3, 3, 5, .2), rgba(3, 3, 5, .85) 45%); animation: zoom-in .35s var(--ease-out) both; }
+.intro-card { width: min(100%, 440px); display: grid; gap: 6px; border-image-source: var(--frame-teal); }
+.intro-card h2 { color: var(--teal); display: flex; justify-content: space-between; }
+.intro-count { color: var(--muted); }
+.intro-card .log { font-size: var(--fs-ui); }
+
+/* мягкий режим: без мерцания, сбоев и глаз; карты, толкования и целостность остаются */
+html.soft .crt { animation: none; opacity: .55; }
+html.soft .logo-word, html.soft .logo-word::before, html.soft .logo-word::after { animation: none !important; }
+html.soft .logo-word::before, html.soft .logo-word::after { opacity: 0; }
+html.soft .flipped.damaged:not(.instant), html.soft .flipped .side.face { animation: none !important; }
+html.soft .reading.damaged { animation: panel-in .42s var(--ease-out) backwards; }
+html.soft .boot-eye.open { animation: lids 1.1s steps(1, end) forwards; }
+
 @media (prefers-reduced-motion: reduce) {
-  .logo-ext, .boot-eye, .spread-option, .m-line, .m-node, .mm-sq, .mm-dot, .zoom, .zoom-card, .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
+  .intro, .logo-ext, .boot-eye, .spread-option, .m-line, .m-node, .mm-sq, .mm-dot, .zoom, .zoom-card, .screen, .app.leaving > .screen, .reading, .person, .diary li, .door, .sweep, .btn.primary.cta, .slot .tap, .pcard-flip, .pcard-inner, .side, .slot.deal, .shuffle-card, .reading .reveal, .blink, .boot-skip, .hint, .crt, .altar::before, .signal i, .btn:hover, .reading.damaged, .portrait-part, .logo-word, .logo-word::before, .logo-word::after, .thread path, .fan-card, .mw-ring, .mw-planets text, .mw-aspect, .el-bar i, .cap-img, .w-over-planet, .w-thread { animation: none !important; }
   .wheel { transition: none; }
   .flipped::after, .sweep { display: none; }
   .boot-eye.open { clip-path: inset(10% 0 10% 0); }

@@ -1,6 +1,8 @@
 // Звук «Нити»: всё синтезируется Web Audio, без файлов. По умолчанию выключен, включается кнопкой ♪.
 // Браузеры разрешают звук только после жеста пользователя, поэтому контекст создаётся при включении.
 
+import { SETTINGS_EVENT, loadSettings } from './settings'
+
 const KEY = 'nit.sound.v1'
 
 let ctx: AudioContext | null = null
@@ -21,7 +23,10 @@ function audio(): { ctx: AudioContext; out: GainNode } | null {
     if (!Ctor) return null
     ctx = new Ctor()
     master = ctx.createGain()
-    master.gain.value = 0.5
+    master.gain.value = loadSettings().volume
+    window.addEventListener(SETTINGS_EVENT, () => {
+      if (master && ctx) master.gain.setTargetAtTime(loadSettings().volume, ctx.currentTime, 0.05)
+    })
     master.connect(ctx.destination)
   }
   if (ctx.state === 'suspended') void ctx.resume()
@@ -176,8 +181,16 @@ function modem() {
 
 export type Sfx = 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type' | 'glitch' | 'lag' | 'modem' | 'blink'
 
+/** Жуткие звуки, которые в мягком режиме заменяются спокойными или молчат. */
+const HARSH: Partial<Record<Sfx, Sfx | null>> = { corrupt: 'flip', glitch: null, lag: null, static: null }
+
 export function play(sfx: Sfx) {
   if (!soundEnabled()) return
+  if (loadSettings().soft && sfx in HARSH) {
+    const calm = HARSH[sfx]
+    if (calm) play(calm)
+    return
+  }
   switch (sfx) {
     case 'tap':
       tone(880, 0.04, 0.05)

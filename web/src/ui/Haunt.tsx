@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { SETTINGS_EVENT, loadSettings } from '../settings'
 
 /** Логический пиксель фона в CSS-пикселях: фон рисуется крупными пикселями, как карты. */
 const PX = 3
@@ -85,6 +86,13 @@ export function Haunt() {
     let eyes: Eye[] = []
     let motes: Mote[] = []
     let look = { x: 0, y: 0 }
+    // мягкий режим: только пыль, без глаз и помех
+    let soft = loadSettings().soft
+    const onSettings = () => {
+      soft = loadSettings().soft
+      if (soft) eyes = []
+    }
+    window.addEventListener(SETTINGS_EVENT, onSettings)
     let glitchUntil = 0
     let nextGlitch = performance.now() + rand(6000, 14000)
 
@@ -127,7 +135,7 @@ export function Haunt() {
         d.fillStyle = `rgba(217, 210, 195, ${m.a})`
         d.fillRect(Math.round(m.x), Math.round(m.y), 1, 1)
       }
-      if (still) return
+      if (still || soft) return
       // глаза
       eyes = eyes.filter((e) => t - e.born < e.life)
       const max = Math.max(2, Math.round((w * h) / 9000))
@@ -165,6 +173,7 @@ export function Haunt() {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerdown', onMove)
       window.removeEventListener('resize', resize)
+      window.removeEventListener(SETTINGS_EVENT, onSettings)
       document.removeEventListener('visibilitychange', onVis)
     }
   }, [])

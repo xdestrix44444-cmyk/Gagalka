@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { loadSettings } from '../settings'
 import { play } from '../sound'
 
 // Вымаранный текст: под блоками ████ лежат настоящие буквы. Изредка одна-две из них
@@ -23,7 +24,8 @@ export function Redacted({ text, opened = 0, seed = 7 }: { text: string; opened?
   const [flash, setFlash] = useState<number[]>([])
 
   useEffect(() => {
-    if (reducedMotion()) return
+    // в мягком режиме буквы не просвечивают
+    if (reducedMotion() || loadSettings().soft) return
     let t: ReturnType<typeof setTimeout>
     const tick = () => {
       // раз в 4–12 секунд просвечивают одна-две случайные буквы: глитч, потом подвисание

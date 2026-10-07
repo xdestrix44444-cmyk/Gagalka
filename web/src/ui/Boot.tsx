@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import backImg from '../art/img/back.jpg'
 import { moonAge, omensFor, type Omen } from '../creep'
+import { loadSettings } from '../settings'
 import { loadHistory } from '../storage'
 import { SOUND_EVENT, play, resumeSound, setSound, soundEnabled } from '../sound'
 import { Redacted } from './Redacted'
@@ -122,7 +123,7 @@ export function Boot({ onDone }: { onDone: () => void }) {
 
   // моргание глаза со звуком: совпадает с анимацией eye-blink (задержка 2,6 с, цикл 7 с, веки смыкаются на 62%)
   useEffect(() => {
-    if (!ready || reducedMotion()) return
+    if (!ready || reducedMotion() || loadSettings().soft) return
     let iv: ReturnType<typeof setInterval>
     const first = setTimeout(() => {
       play('blink')

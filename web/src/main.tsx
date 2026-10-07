@@ -9,9 +9,11 @@ import '@fontsource/pt-serif/400.css'
 import '@fontsource/pt-serif/400-italic.css'
 import '@fontsource/pt-serif/700.css'
 import './styles.css'
+import { applySettings } from './settings'
 import { installFrames } from './ui/frames'
 
 installFrames()
+applySettings()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

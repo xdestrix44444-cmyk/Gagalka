@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { omensFor, rollIntegrity, type Omen } from './creep'
 import { AiText } from './AiText'
 import { DECK, integrityState } from './deck'
@@ -9,16 +9,21 @@ import { FLIP_MS, PixelCard, ShuffleDeck } from './PixelCard'
 import { MatrixScreen } from './matrix/MatrixScreen'
 import { NatalScreen } from './natal/NatalScreen'
 import { Reading, ReadingText } from './Reading'
-import { entryIntegrity, loadDayCard, loadHistory, saveDayCard, saveHistoryEntry } from './storage'
+import { Diary } from './Diary'
+import { loadDayCard, loadHistory, saveDayCard, saveHistoryEntry, updateHistoryEntry } from './storage'
+import { ShareReading } from './ui/ShareReading'
 import { play, resumeSound } from './sound'
 import { haptic, initTelegram } from './telegram'
 import { Boot, shouldBoot } from './ui/Boot'
 import { Haunt } from './ui/Haunt'
 import { Menu } from './ui/Menu'
 import { ScreenHead } from './ui/ScreenHead'
+import { Intro, introSeen } from './ui/Intro'
+import { SettingsScreen } from './ui/Settings'
 import { StatusBar } from './ui/StatusBar'
+import { TabBar, type Section } from './ui/TabBar'
 
-type Screen = 'menu' | 'tarot' | 'spread' | 'diary' | 'natal' | 'matrix'
+type Screen = 'menu' | 'tarot' | 'spread' | 'diary' | 'natal' | 'matrix' | 'settings'
 
 /** Сколько тасуется колода перед картой дня, мс; совпадает с .shuffle в styles.css. */
 const SHUFFLE_MS = 1100
@@ -66,13 +71,26 @@ export function App() {
     setScreen(s)
     window.scrollTo({ top: 0 })
   }
+  // вступление: при первом входе в меню или по кнопке в настройках
+  const [intro, setIntro] = useState(() => !introSeen())
+  // куда вернуться из настроек
+  const [beforeSettings, setBeforeSettings] = useState<Screen>('menu')
+  const section: Section | null = screen === 'tarot' || screen === 'spread' || screen === 'diary' ? 'tarot' : screen === 'natal' ? 'natal' : screen === 'matrix' ? 'matrix' : null
+  const withTabs = screen !== 'menu'
   return (
     <>
       <Haunt />
       {/* звук можно запустить только после жеста: первое касание возобновляет гул, если он включён */}
-      <main className={leaving ? 'app leaving' : 'app'} onPointerDown={resumeSound}>
+      <main className={`app${leaving ? ' leaving' : ''}${withTabs ? ' with-tabs' : ''}`} onPointerDown={resumeSound}>
         <div key={screen} className="sweep" aria-hidden="true" />
-        <StatusBar onHome={() => go('menu')} />
+        <StatusBar
+          onHome={() => go('menu')}
+          onSettings={() => {
+            if (screen === 'settings') return
+            setBeforeSettings(screen)
+            go('settings')
+          }}
+        />
         {screen === 'menu' && (
           <Menu
             greeting={tg.firstName ? `с возвращением, ${tg.firstName}` : 'пользователь опознан'}
@@ -84,7 +102,18 @@ export function App() {
         {screen === 'diary' && <Diary onBack={() => go('tarot')} />}
         {screen === 'natal' && <NatalScreen onBack={() => go('menu')} />}
         {screen === 'matrix' && <MatrixScreen onBack={() => go('menu')} />}
+        {screen === 'settings' && (
+          <SettingsScreen
+            onBack={() => go(beforeSettings)}
+            onShowIntro={() => {
+              show('menu')
+              setIntro(true)
+            }}
+          />
+        )}
       </main>
+      {withTabs && <TabBar active={section} onGo={(s) => go(s)} />}
+      {intro && !booting && screen === 'menu' && <Intro onClose={() => setIntro(false)} />}
       <div className="crt" aria-hidden="true" />
       {booting && <Boot onDone={() => setBooting(false)} />}
     </>
@@ -92,10 +121,43 @@ export function App() {
 }
 
 /** Заголовок экрана с пиксельными ромбами по краям. */
+/** Сколько осталось до новой карты дня (до местной полуночи); в полночь сообщает о новом дне. */
+function NextDay({ onNewDay }: { onNewDay: () => void }) {
+  const left = () => {
+    const now = new Date()
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    return Math.max(0, Math.round((midnight.getTime() - now.getTime()) / 1000))
+  }
+  const [sec, setSec] = useState(left)
+  useEffect(() => {
+    const t = setInterval(() => {
+      const s = left()
+      setSec(s)
+      if (s === 0) onNewDay()
+    }, 1000)
+    return () => clearInterval(t)
+  }, [])
+  const hh = String(Math.floor(sec / 3600)).padStart(2, '0')
+  const mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0')
+  const ss = String(sec % 60).padStart(2, '0')
+  return (
+    <p className="next-day">
+      <span className="prompt">&gt;</span> следующая запись через <b>{hh}:{mm}:{ss}</b>
+    </p>
+  )
+}
+
 /** Раздел таро: карта дня, вход в расклад и дневник. */
 function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: () => void; onMenu: () => void }) {
-  const today = useMemo(() => dayKey(), [])
+  const [today, setToday] = useState(dayKey)
   const [day, setDay] = useState(() => loadDayCard(today))
+  // наступила полночь, пока экран открыт: новая карта дня
+  const newDay = () => {
+    const key = dayKey()
+    setToday(key)
+    setDay(loadDayCard(key))
+    setJustRevealed(false)
+  }
   const cardId = day ? day.cardId : null
   // тасование перед картой дня; justRevealed — карту открыли сейчас, а не раньше сегодня
   const [shuffling, setShuffling] = useState(false)
@@ -119,9 +181,9 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
     const [card] = drawCards(1)
     const { integrity, omens } = rollFor(card.id, lastCardId())
     revealFx(integrity)
-    const entry = { cardId: card.id, integrity, omens }
+    const h = saveHistoryEntry({ kind: 'day', cards: [card.id], integrity: [integrity] })
+    const entry = { cardId: card.id, integrity, omens, historyId: h.id }
     saveDayCard(today, entry)
-    saveHistoryEntry({ kind: 'day', cards: [card.id], integrity: [integrity] })
     setDay(entry)
     setJustRevealed(true)
   }
@@ -151,6 +213,7 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
                 onDone={(ai) => {
                   const next = { ...day, ai }
                   saveDayCard(today, next)
+                  if (day.historyId) updateHistoryEntry(day.historyId, { ai })
                   setDay(next)
                 }}
               />
@@ -166,8 +229,10 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
             </button>
           ))}
       </div>
+      {card && day && <NextDay onNewDay={newDay} />}
       <div className="divider" aria-hidden="true" />
       <div className="actions">
+        {card && day && <ShareReading title="Карта дня" cards={[{ id: card.id, integrity: day.integrity }]} />}
         <button type="button" className={card ? 'btn primary wide' : 'btn'} onClick={onSpread}>
           {card ? 'Сделать расклад' : 'Расклад'}
         </button>
@@ -265,10 +330,17 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
     setOpen((prev) => prev.map((v, k) => (k === i ? true : v)))
   }
 
-  // расклад попадает в дневник, когда открыта последняя карта
+  // расклад попадает в дневник, когда открыта последняя карта; толкование дописывается, когда придёт
+  const historyId = useRef<string | null>(null)
+  const pendingAi = useRef<string | null>(null)
   useEffect(() => {
-    if (allOpen) saveHistoryEntry({ kind, cards: cards.map((c) => c.id), integrity })
+    if (!allOpen) return
+    historyId.current = saveHistoryEntry({ kind, cards: cards.map((c) => c.id), integrity, question: question || undefined, ai: pendingAi.current ?? undefined }).id
   }, [allOpen])
+  const saveAi = (ai: string) => {
+    if (historyId.current) updateHistoryEntry(historyId.current, { ai })
+    else pendingAi.current = ai
+  }
 
   const many = kind === 'celtic'
   return (
@@ -317,6 +389,7 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
                       request={{ kind, cards: [{ id: c.id, integrity: integrity[i], omens: omens[i] }], question: question || undefined }}
                       delay={FLIP_MS + 1400}
                       fallback={<ReadingText card={c} integrity={integrity[i]} />}
+                      onDone={saveAi}
                     />
                   ) : null
                 }
@@ -332,6 +405,7 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
               fallback={cards.map((c, i) => (
                 <ReadingText key={i} card={c} integrity={integrity[i]} label={positions[i]} />
               ))}
+              onDone={saveAi}
             />
           </article>
         )}
@@ -340,6 +414,7 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
         <>
           <div className="divider" aria-hidden="true" />
           <div className="actions">
+            <ShareReading title={spread.name} cards={cards.map((c, i) => ({ id: c.id, integrity: integrity[i], label: positions[i] }))} question={question || undefined} />
             <button type="button" className="btn primary wide" onClick={onAgain}>
               Новый расклад
             </button>
@@ -350,38 +425,3 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
   )
 }
 
-function Diary({ onBack }: { onBack: () => void }) {
-  const history = useMemo(() => loadHistory(), [])
-  const fmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
-  return (
-    <section className="screen">
-      <ScreenHead title="Дневник" onBack={onBack} />
-      {history.length === 0 ? (
-        <p className="lede">Здесь появятся ваши расклады. Откройте карту дня или сделайте первый расклад.</p>
-      ) : (
-        <ul className="diary">
-          {history.map((h) => (
-            <li key={h.id}>
-              <span className="when">
-                [{fmt.format(h.at)}] <span className="kind">{h.kind === 'day' ? 'карта дня' : SPREADS[h.kind].name}</span>
-              </span>
-              <span className="names">
-                {h.cards.map((id, i) => {
-                  const v = entryIntegrity(h, i)
-                  const state = v === null ? 'whole' : integrityState(v)
-                  return (
-                    <span key={i} className={state}>
-                      {i > 0 && ', '}
-                      {DECK[id].name}
-                      {v !== null && <span className="pct"> {v}%{state === 'damaged' && ' ↓'}</span>}
-                    </span>
-                  )
-                })}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  )
-}
