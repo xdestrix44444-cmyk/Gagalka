@@ -79,7 +79,8 @@ describe('rollIntegrity', () => {
 
 describe('moonAge', () => {
   it('знает новолуние 6 января 2000', () => {
-    expect(moonAge(new Date(Date.UTC(2000, 0, 6, 18, 14)))).toBeCloseTo(0, 5)
+    const age = moonAge(new Date(Date.UTC(2000, 0, 6, 18, 14)))
+    expect(Math.min(age, 29.530588853 - age)).toBeLessThan(0.05)
     expect(isNewMoon(new Date(Date.UTC(2000, 0, 7, 12, 0)))).toBe(true)
   })
 

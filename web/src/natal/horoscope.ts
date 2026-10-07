@@ -2,6 +2,7 @@
 // Классический «солнечный» способ: знак считается первым домом, следующий знак — вторым и так далее,
 // и смотрим, по каким сферам сейчас идут Луна и планеты. Тексты временные до подключения ИИ.
 
+import { SearchMoonPhase } from 'astronomy-engine'
 import { moonAge } from '../creep'
 import { SIGNS_GEN, computeChart, inSign, type PlanetKey } from './chart'
 import { HOUSE_SPHERE } from './meanings'
@@ -68,18 +69,17 @@ function moonPhase(date: Date): string {
   return `${age < SYNODIC / 2 ? 'растущая' : 'убывающая'} луна, ${lit}%`
 }
 
-/** Новолуния и полнолуния в ближайшие дни: момент, когда возраст луны проходит 0 или половину цикла. */
+/** Новолуния и полнолуния в ближайшие дни: точные моменты из astronomy-engine. */
 export function lunations(from: Date, days: number): { kind: 'new' | 'full'; at: Date }[] {
   const out: { kind: 'new' | 'full'; at: Date }[] = []
-  const step = 3 * 3_600_000
-  let prev = moonAge(from)
-  for (let t = from.getTime() + step; t <= from.getTime() + days * DAY; t += step) {
-    const age = moonAge(new Date(t))
-    if (age < prev) out.push({ kind: 'new', at: new Date(t) })
-    else if (prev < SYNODIC / 2 && age >= SYNODIC / 2) out.push({ kind: 'full', at: new Date(t) })
-    prev = age
+  for (const [kind, angle] of [['new', 0], ['full', 180]] as const) {
+    let t = SearchMoonPhase(angle, from, days)
+    while (t && t.date.getTime() <= from.getTime() + days * DAY) {
+      out.push({ kind, at: t.date })
+      t = SearchMoonPhase(angle, new Date(t.date.getTime() + DAY), days)
+    }
   }
-  return out
+  return out.sort((a, b) => a.at.getTime() - b.at.getTime())
 }
 
 export function horoscope(sign: number, period: HoroscopePeriod, now = new Date()): Horoscope {
@@ -92,9 +92,16 @@ export function horoscope(sign: number, period: HoroscopePeriod, now = new Date(
   if (period === 'day') {
     lines.push(MOON_DAY[solarHouse(sign, moon.sign)])
     for (const p of sky.planets) if (['sun', 'mercury', 'venus', 'mars'].includes(p.key) && p.sign === sign) lines.push(IN_YOUR_SIGN[p.key]!)
-    const age = moonAge(now)
-    if (age < 1.5 || age > SYNODIC - 1.5) lines.push(`Сегодня новолуние в сфере «${sphere(moon.sign)}»: хорошее время загадать и начать что-то новое именно здесь.`)
-    else if (Math.abs(age - SYNODIC / 2) < 1.5) lines.push(`Сегодня полнолуние в сфере «${sphere(moon.sign)}»: эмоции на пике, что-то здесь дозревает до итога.`)
+    // новолуние или полнолуние — только если точный момент приходится на сегодняшние сутки
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    for (const l of lunations(midnight, 1)) {
+      const m = computeChart(l.at).planets.find((p) => p.key === 'moon')!
+      lines.push(
+        l.kind === 'new'
+          ? `Сегодня новолуние в сфере «${sphere(m.sign)}»: хорошее время загадать и начать что-то новое именно здесь.`
+          : `Сегодня полнолуние в сфере «${sphere(m.sign)}»: эмоции на пике, что-то здесь дозревает до итога.`,
+      )
+    }
     if (sky.planets.find((p) => p.key === 'mercury')!.retro) lines.push('Меркурий ретрограден: перечитывайте сообщения перед отправкой и не удивляйтесь задержкам.')
     return { sky: skyLine, lines }
   }

@@ -23,3 +23,12 @@ describe('гороскоп по знаку', () => {
     expect(l.length).toBeLessThanOrEqual(2)
   })
 })
+
+describe('лунации', () => {
+  it('точные даты осени 2026', () => {
+    const l = lunations(new Date('2026-10-01T00:00:00Z'), 31)
+    const fmt = (d: Date) => d.toISOString().slice(0, 16)
+    // по таблицам: новолуние 10.10.2026 15:50 UTC, полнолуние 26.10.2026 04:12 UTC
+    expect(l.map((x) => `${x.kind} ${fmt(x.at)}`)).toEqual(['new 2026-10-10T15:50', 'full 2026-10-26T04:12'])
+  })
+})

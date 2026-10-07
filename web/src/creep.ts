@@ -2,7 +2,7 @@
 // ЦЕЛ — прямое значение, ЧАСТИЧНО — прямое с помехой, ПОВРЕЖДЁН — карта перевёрнута, читается её тень.
 // Знамения (ночь, фазы луны, ретроградный Меркурий, повтор карты, пятница 13-е) повышают риск сбоя.
 
-import { Body, Ecliptic, GeoVector } from 'astronomy-engine'
+import { Body, Ecliptic, GeoVector, MoonPhase } from 'astronomy-engine'
 
 /** Шансы состояний в обычный день: половина целых, четверть с помехой, четверть повреждённых. */
 export const BASE_DAMAGE = 0.25
@@ -10,12 +10,10 @@ export const PARTIAL = 0.25
 export const MAX_DAMAGE = 0.6
 
 const SYNODIC = 29.530588853
-const KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14)
 
-/** Возраст луны в сутках (0 — новолуние). Приближённая формула, этого достаточно для игры. */
+/** Возраст луны в сутках (0 — новолуние, половина цикла — полнолуние): по настоящему углу Луна–Солнце из astronomy-engine. */
 export function moonAge(date: Date): number {
-  const days = (date.getTime() - KNOWN_NEW_MOON) / 86_400_000
-  return ((days % SYNODIC) + SYNODIC) % SYNODIC
+  return (MoonPhase(date) / 360) * SYNODIC
 }
 
 export function isNewMoon(date: Date): boolean {
