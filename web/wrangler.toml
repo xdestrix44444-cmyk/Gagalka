@@ -1,0 +1,19 @@
+# Cloudflare Worker с ИИ-толкованиями для бота: https://nit-api.nit-web.workers.dev
+# Выкладка: npm run deploy:api. Ключ — секрет: npx wrangler secret put GEMINI_API_KEY
+name = "nit-api"
+main = "server/worker.ts"
+compatibility_date = "2026-10-01"
+
+# Gemini не работает из России, а Worker по умолчанию выполняется на узле рядом с пользователем —
+# закрепляем выполнение в регионе США, чтобы запросы к Gemini всегда шли оттуда
+[placement]
+region = "gcp:us-east4"
+
+[vars]
+ALLOW_ORIGIN = "https://xdestrix44444-cmyk.github.io"
+
+# не больше 10 толкований в минуту с одного адреса
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }

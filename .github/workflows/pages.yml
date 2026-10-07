@@ -31,7 +31,10 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
+      # адрес сервера толкований (Cloudflare Worker) — переменная репозитория API_URL
       - run: npx vite build --base ./
+        env:
+          VITE_API_URL: ${{ vars.API_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist

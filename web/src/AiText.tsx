@@ -2,12 +2,15 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ReadingRequest } from './reading-request'
 import { play } from './sound'
 
+/** Адрес сервера толкований. Пусто — тот же сайт (в разработке Vite проксирует /api на npm run server). */
+const API = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+
 /**
  * Запрашивает толкование у сервера и отдаёт текст по мере генерации.
  * Возвращает весь текст; бросает ошибку, если ИИ недоступен или ответ пустой.
  */
 export async function streamReading(req: ReadingRequest, onText: (text: string) => void, signal?: AbortSignal): Promise<string> {
-  const res = await fetch('/api/reading', {
+  const res = await fetch(`${API}/api/reading`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(req),

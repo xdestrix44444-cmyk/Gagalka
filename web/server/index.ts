@@ -1,10 +1,12 @@
 // Сервер ИИ-толкований «Нити». Ключ API живёт только здесь, в переменных окружения (web/.env).
 // POST /api/reading — толкование потоком обычного текста; GET /api/health — включён ли ИИ.
+// Модель: Gemini, если задан GEMINI_API_KEY (бесплатный лимит), иначе Claude по ANTHROPIC_API_KEY.
 // Запуск: npm run server (в разработке Vite проксирует /api сюда).
 
 import Anthropic from '@anthropic-ai/sdk'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { parseReadingRequest } from '../src/reading-request'
+import { DEFAULT_MODEL, GeminiError, geminiStream } from './gemini'
 import { SYSTEM_PROMPT, buildUserMessage } from './prompt'
 
 try {
@@ -14,13 +16,19 @@ try {
 }
 
 const PORT = Number(process.env.PORT ?? 8787)
-const MODEL = 'claude-sonnet-5-5'
+const CLAUDE_MODEL = 'claude-sonnet-5-5'
 /** Запросов с одного адреса в час. Грубая защита от перерасхода до подключения подписки. */
 const HOURLY_LIMIT = Number(process.env.READINGS_PER_HOUR ?? 30)
 const BODY_LIMIT = 4096
 
-const hasKey = () => !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN)
-const client = hasKey() ? new Anthropic() : null
+const useGemini = !!process.env.GEMINI_API_KEY
+const hasClaudeKey = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN)
+const client = !useGemini && hasClaudeKey ? new Anthropic() : null
+const aiOn = useGemini || !!client
+const GEMINI = { key: process.env.GEMINI_API_KEY ?? '', model: process.env.GEMINI_MODEL }
+const MODEL = useGemini ? (GEMINI.model ?? DEFAULT_MODEL) : CLAUDE_MODEL
+/** С какого адреса приложению можно обращаться к серверу: приложение на GitHub Pages, сервер — на своём домене. */
+const ALLOW_ORIGIN = process.env.ALLOW_ORIGIN ?? '*'
 
 const hits = new Map<string, number[]>()
 
@@ -57,7 +65,7 @@ async function readBody(req: IncomingMessage): Promise<string | null> {
 }
 
 async function reading(req: IncomingMessage, res: ServerResponse) {
-  if (!client) return json(res, 503, { error: 'no-key' })
+  if (!aiOn) return json(res, 503, { error: 'no-key' })
   const body = await readBody(req)
   if (body === null) return json(res, 413, { error: 'слишком большой запрос' })
   let raw: unknown
@@ -69,6 +77,8 @@ async function reading(req: IncomingMessage, res: ServerResponse) {
   const parsed = parseReadingRequest(raw)
   if (typeof parsed === 'string') return json(res, 400, { error: parsed })
   if (!allow(clientIp(req))) return json(res, 429, { error: 'слишком много толкований, попробуйте через час' })
+  if (useGemini) return readingGemini(buildUserMessage(parsed), res)
+  if (!client) return
 
   const stream = client.beta.messages.stream({
     model: MODEL,
@@ -110,9 +120,43 @@ async function reading(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+async function readingGemini(user: string, res: ServerResponse) {
+  // человек закрыл экран — обрываем запрос, чтобы не тратить лимит
+  const ctrl = new AbortController()
+  res.on('close', () => {
+    if (!res.writableFinished) ctrl.abort()
+  })
+  let started = false
+  try {
+    const it = geminiStream(GEMINI, SYSTEM_PROMPT, user, ctrl.signal)
+    let step = await it.next()
+    for (; !step.done; step = await it.next()) {
+      if (!started) {
+        res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' })
+        started = true
+      }
+      res.write(step.value)
+    }
+    const finish = step.value
+    if (finish && finish !== 'STOP') console.warn('Gemini остановился:', finish)
+    if (!started) return json(res, 502, { error: finish?.startsWith('BLOCKED') || finish === 'SAFETY' ? 'refusal' : 'пустой ответ' })
+    res.end()
+  } catch (err) {
+    if (err instanceof GeminiError) console.warn(err.status === 429 ? 'лимит Gemini исчерпан' : `ошибка Gemini ${err.status}`, err.message)
+    else if (!ctrl.signal.aborted) console.error(err)
+    if (!started && !res.headersSent) json(res, 502, { error: 'ИИ недоступен' })
+    else res.end()
+  }
+}
+
 createServer((req, res) => {
   const url = req.url?.split('?')[0]
-  if (req.method === 'GET' && url === '/api/health') return json(res, 200, { ai: !!client, model: MODEL })
+  res.setHeader('access-control-allow-origin', ALLOW_ORIGIN)
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, { 'access-control-allow-methods': 'GET, POST', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' })
+    return res.end()
+  }
+  if (req.method === 'GET' && url === '/api/health') return json(res, 200, { ai: aiOn, model: MODEL })
   if (req.method === 'POST' && url === '/api/reading') {
     reading(req, res).catch((err) => {
       console.error(err)
@@ -122,5 +166,5 @@ createServer((req, res) => {
   }
   json(res, 404, { error: 'не найдено' })
 }).listen(PORT, () => {
-  console.log(`Нить: сервер толкований на http://localhost:${PORT} · ИИ ${client ? `включён (${MODEL})` : 'выключен: нет ANTHROPIC_API_KEY в web/.env'}`)
+  console.log(`Нить: сервер толкований на http://localhost:${PORT} · ИИ ${aiOn ? `включён (${MODEL})` : 'выключен: нет GEMINI_API_KEY или ANTHROPIC_API_KEY в web/.env'}`)
 })
