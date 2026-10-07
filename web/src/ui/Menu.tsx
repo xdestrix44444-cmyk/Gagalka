@@ -1,31 +1,87 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import backImg from '../art/img/back.jpg'
-import { PLANETS, SIGN_GLYPHS } from '../natal/chart'
-import { play } from '../sound'
+import { ACTIVE_IDS } from '../deck'
+import { PLANETS, SIGN_GLYPHS, computeChart } from '../natal/chart'
+import { play, soundEnabled, startModem, stopModem } from '../sound'
+import { preloadCards } from '../sprites'
 
 export type Door = 'tarot' | 'natal' | 'matrix'
 
 /** Сколько длится «провал» в выбранную дверь, мс; совпадает с .door.dive в styles.css. */
 const DIVE_MS = 650
 const MODEM_KEY = 'nit.modem'
+/** Если запись модема не зазвучала за это время (медленная сеть), двери открываются без неё, мс. */
+const MODEM_WAIT_MS = 3000
+/** «Связь установлена» висит на экране перед тем, как двери загорятся, мс. */
+const ONLINE_MS = 900
+
+/** Первый вход в меню за сеанс: тогда звучит дозвон. Только чтение — запись в эффекте. */
+function firstVisit(): boolean {
+  try {
+    return !sessionStorage.getItem(MODEM_KEY)
+  } catch {
+    return false
+  }
+}
+
+type Link = 'dial' | 'online' | 'ready'
 
 /** Меню входа: три двери строками — таро, натальная карта и матрица судьбы. Выбранная дверь затягивает экран внутрь. */
 export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Door) => void }) {
   const [diving, setDiving] = useState<Door | null>(null)
+  // при первом входе за сеанс программа «выходит на связь»: пока звучит дозвон, двери заперты,
+  // а приложение тем временем подгружает рисунки карт и прогревает расчёт неба
+  const [link, setLink] = useState<Link>(() => (firstVisit() ? 'dial' : 'ready'))
+  const [progress, setProgress] = useState(0)
+  // дозвон решается один раз при открытии меню: смена dial → online → ready его не перезапускает
+  const dialing = useRef(link === 'dial')
 
-  // при первом входе в меню за сеанс — дозвон модема, будто программа выходит на связь
   useEffect(() => {
+    if (!dialing.current) return
     try {
-      if (sessionStorage.getItem(MODEM_KEY)) return
       sessionStorage.setItem(MODEM_KEY, '1')
     } catch {
-      return
+      // без сохранения: дозвон прозвучит и в следующий раз
     }
-    play('modem')
+    void preloadCards(ACTIVE_IDS, 15000)
+    const warm = setTimeout(() => computeChart(new Date()), 50)
+    if (!soundEnabled()) {
+      setLink('ready')
+      return () => clearTimeout(warm)
+    }
+    let alive = true
+    let started = false
+    const timers: ReturnType<typeof setTimeout>[] = [warm]
+    let tick: ReturnType<typeof setInterval> | undefined
+    timers.push(
+      setTimeout(() => {
+        if (started || !alive) return
+        stopModem()
+        setLink('ready')
+      }, MODEM_WAIT_MS),
+    )
+    void startModem().then((sec) => {
+      if (!alive) return
+      started = true
+      if (sec === null) return setLink('ready')
+      const t0 = performance.now()
+      const dial = Math.max(0.1, sec * 1000 - ONLINE_MS)
+      tick = setInterval(() => setProgress(Math.min(1, (performance.now() - t0) / dial)), 120)
+      timers.push(setTimeout(() => setLink('online'), dial))
+      timers.push(setTimeout(() => setLink('ready'), sec * 1000))
+    })
+    return () => {
+      alive = false
+      timers.forEach(clearTimeout)
+      clearInterval(tick)
+      // ушли из меню, не дождавшись связи, — дозвон обрывается
+      stopModem()
+    }
   }, [])
 
+  const locked = link !== 'ready'
   const enter = (d: Door) => {
-    if (diving) return
+    if (diving || locked) return
     play('flip')
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return onEnter(d)
     setDiving(d)
@@ -46,14 +102,26 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
         </span>
       </div>
       <p className="lede tagline">Ответ уже готов. Осталось задать вопрос.</p>
+      {link !== 'ready' && (
+        <p className={`dial ${link}`} aria-live="polite">
+          <span className="prompt">&gt;</span>{' '}
+          {link === 'dial' ? (
+            <>
+              дозвон… <span className="dial-bar">{'▓'.repeat(Math.round(progress * 12))}{'░'.repeat(12 - Math.round(progress * 12))}</span>
+            </>
+          ) : (
+            'связь установлена'
+          )}
+        </p>
+      )}
 
       {/* нить: спускается от названия к дверям */}
       <svg className="thread" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true">
         <path d="M100 0 V40" />
       </svg>
 
-      <div className="doors">
-        <button type="button" className={`door tarot${diving === 'tarot' ? ' dive' : ''}`} onClick={() => enter('tarot')} onPointerEnter={() => play('type')}>
+      <div className={locked ? 'doors locked' : 'doors'}>
+        <button type="button" className={`door tarot${diving === 'tarot' ? ' dive' : ''}`} aria-disabled={locked} onClick={() => enter('tarot')} onPointerEnter={() => play('type')}>
           <span className="door-art fan" aria-hidden="true">
             {[0, 1, 2].map((i) => (
               <span key={i} className={`fan-card f${i}`} style={{ backgroundImage: `url(${backImg})` }} />
@@ -63,7 +131,7 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
           <span className="door-sub">колода помнит</span>
         </button>
 
-        <button type="button" className={`door natal${diving === 'natal' ? ' dive' : ''}`} onClick={() => enter('natal')} onPointerEnter={() => play('type')}>
+        <button type="button" className={`door natal${diving === 'natal' ? ' dive' : ''}`} aria-disabled={locked} onClick={() => enter('natal')} onPointerEnter={() => play('type')}>
           <span className="door-art" aria-hidden="true">
             <svg className="mini-wheel" viewBox="0 0 120 120">
               <g className="mw-ring">
@@ -99,7 +167,7 @@ export function Menu({ greeting, onEnter }: { greeting: string; onEnter: (d: Doo
           <span className="door-sub">небо вашего часа</span>
         </button>
 
-        <button type="button" className={`door matrix${diving === 'matrix' ? ' dive' : ''}`} onClick={() => enter('matrix')} onPointerEnter={() => play('type')}>
+        <button type="button" className={`door matrix${diving === 'matrix' ? ' dive' : ''}`} aria-disabled={locked} onClick={() => enter('matrix')} onPointerEnter={() => play('type')}>
           <span className="door-art" aria-hidden="true">
             {/* восьмиугольник матрицы: два квадрата медленно вращаются навстречу друг другу */}
             <svg className="mini-matrix" viewBox="0 0 120 120">

@@ -42,6 +42,12 @@ html.glitch-split .app { animation: screen-split .3s steps(3, end); }
 .glitch-bars i { position: absolute; left: 0; right: 0; transform: translateX(var(--dx));
   background: repeating-linear-gradient(90deg, rgba(181, 84, 60, .35) 0 7px, rgba(6, 6, 8, .6) 7px 11px, rgba(63, 179, 163, .3) 11px 15px, rgba(217, 210, 195, .18) 15px 18px);
   mix-blend-mode: screen; }
+/* меню: пока звучит дозвон, двери заперты; потом загораются */
+.dial { margin: 0; min-height: 1.6em; text-align: center; font-size: var(--fs-meta); color: var(--muted); }
+.dial-bar { color: var(--teal); letter-spacing: .05em; }
+.dial.online { color: var(--teal); text-shadow: 0 0 8px rgba(63, 179, 163, .5); }
+.doors.locked .door { opacity: .35; filter: grayscale(.85); cursor: wait; }
+.doors .door { transition: opacity .4s steps(4, end), filter .4s steps(4, end); }
 .haunt { position: fixed; inset: 0; width: 100vw; height: 100vh; image-rendering: pixelated; z-index: 0; pointer-events: none; }
 .crt { position: fixed; inset: 0; z-index: 50; pointer-events: none;
   background:

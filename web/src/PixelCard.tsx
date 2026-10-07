@@ -100,12 +100,20 @@ function CardZoom({ id, integrity, label, onClose }: { id: number; integrity: nu
   )
 }
 
-/** Стопка из трёх рубашек, которая тасуется, пока выбирается карта. */
-export function ShuffleDeck() {
+/**
+ * Стопка из трёх рубашек, которая тасуется, пока выбирается карта.
+ * onStart и onDone — по самой анимации (а не по таймеру): звук и открытие карты не расходятся с картинкой.
+ */
+export function ShuffleDeck({ onStart, onDone }: { onStart?: () => void; onDone?: () => void }) {
   return (
     <div className="shuffle" aria-hidden="true">
       {[0, 1, 2].map((i) => (
-        <div key={i} className={`shuffle-card s${i}`}>
+        <div
+          key={i}
+          className={`shuffle-card s${i}`}
+          onAnimationStart={i === 0 ? (e) => e.target === e.currentTarget && onStart?.() : undefined}
+          onAnimationEnd={i === 2 ? (e) => e.target === e.currentTarget && onDone?.() : undefined}
+        >
           <PixelCard id={null} label="" />
         </div>
       ))}

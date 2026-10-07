@@ -171,14 +171,25 @@ export function preloadSounds() {
     .catch(() => null)
 }
 
-function modem() {
+/** Идущий сейчас дозвон: его можно оборвать, если человек ушёл из меню. */
+let modemNow: { src: AudioBufferSourceNode; g: GainNode; online: ReturnType<typeof setTimeout> } | null = null
+/** Номер запуска: остановка до того, как запись декодировалась, отменяет и сам запуск. */
+let modemTicket = 0
+
+/**
+ * Дозвон модема. Промис отвечает, когда звук начался: сколько секунд он продлится вместе со «связь установлена»,
+ * или null — звук выключен, контекста нет или запись не загрузилась.
+ */
+export function startModem(): Promise<number | null> {
+  if (!soundEnabled()) return Promise.resolve(null)
   const a = audio()
-  if (!a) return
+  if (!a) return Promise.resolve(null)
   const { ctx: c, out } = a
+  const ticket = ++modemTicket
   preloadSounds()
   modemBuf ??= modemBytes!.then((b) => (b ? c.decodeAudioData(b) : null)).catch(() => null)
-  void modemBuf.then((buf) => {
-    if (!buf) return
+  return modemBuf.then((buf) => {
+    if (!buf || ticket !== modemTicket) return null
     const src = c.createBufferSource()
     src.buffer = buf
     const g = c.createGain()
@@ -192,9 +203,32 @@ function modem() {
     g.gain.linearRampToValueAtTime(0, end)
     src.connect(g).connect(out)
     src.start(t)
-    online(buf.duration - FADE * 0.6)
+    const at = buf.duration - FADE * 0.6
+    // «связь установлена» — по таймеру, а не заранее в аудио: так её можно отменить вместе с дозвоном
+    modemNow = { src, g, online: setTimeout(() => online(0), at * 1000) }
+    src.onended = () => {
+      if (modemNow?.src === src) modemNow = null
+    }
+    return at + ONLINE_S
   })
 }
+
+/** Оборвать дозвон: короткое затухание, без щелчка. */
+export function stopModem() {
+  modemTicket++
+  if (!modemNow || !ctx) return
+  const { src, g, online: timer } = modemNow
+  modemNow = null
+  clearTimeout(timer)
+  const t = ctx.currentTime
+  g.gain.cancelScheduledValues(t)
+  g.gain.setValueAtTime(g.gain.value, t)
+  g.gain.linearRampToValueAtTime(0, t + 0.15)
+  src.stop(t + 0.2)
+}
+
+/** Сколько звучит «связь установлена», секунды. */
+const ONLINE_S = 1
 
 /** Затухание конца записи модема, секунды. */
 const FADE = 0.5
@@ -211,7 +245,7 @@ function online(at: number) {
 
 export type Sfx =
   | 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type' | 'glitch' | 'lag' | 'modem' | 'blink'
-  | 'press' | 'key' | 'back' | 'screen' | 'think' | 'done' | 'deny' | 'interference'
+  | 'press' | 'key' | 'back' | 'screen' | 'think' | 'done' | 'deny' | 'interference' | 'deal'
 
 /** Случайный разброс высоты, чтобы частые звуки не звучали как одна и та же запись. */
 const jitter = (f: number, spread = 0.06) => f * (1 + (Math.random() * 2 - 1) * spread)
@@ -300,7 +334,12 @@ export function play(sfx: Sfx) {
       burst(900, 2, 0.05, 0.05)
       break
     case 'modem':
-      modem()
+      void startModem()
+      break
+    case 'deal':
+      // карта вылетает из колоды и ложится на стол: шорох и сухой щелчок
+      burst(jitter(2600, 0.15), 1.4, 0.07, 0.12)
+      burst(jitter(4200, 0.1), 3, 0.02, 0.08, 0.06)
       break
   }
 }

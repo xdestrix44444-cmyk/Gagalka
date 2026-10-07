@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type AnimationEvent, type CSSProperties } from 'react'
 import { omensFor, rollIntegrity, type Omen } from './creep'
 import { AiText } from './AiText'
 import { DECK, integrityState } from './deck'
@@ -178,14 +178,22 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
     await preloadCards([card.id])
     setLoading(false)
     if (prefersReducedMotion()) return pick(card)
-    play('shuffle')
+    pending.current = card
     setShuffling(true)
-    const pulses = [SHUFFLE_MS / 3, (SHUFFLE_MS * 2) / 3].map((t) => setTimeout(() => haptic(), t))
-    setTimeout(() => {
-      pulses.forEach(clearTimeout)
-      setShuffling(false)
-      pick(card)
-    }, SHUFFLE_MS)
+  }
+  // звук и вибрация — когда колода правда начала тасоваться, карта — когда тасование закончилось
+  const pending = useRef<(typeof DECK)[number] | null>(null)
+  const pulses = useRef<ReturnType<typeof setTimeout>[]>([])
+  const shuffleStarted = () => {
+    play('shuffle')
+    pulses.current = [SHUFFLE_MS / 3, (SHUFFLE_MS * 2) / 3].map((t) => setTimeout(() => haptic(), t))
+  }
+  const shuffleDone = () => {
+    pulses.current.forEach(clearTimeout)
+    const card = pending.current
+    pending.current = null
+    setShuffling(false)
+    if (card) pick(card)
   }
 
   const pick = (card: (typeof DECK)[number]) => {
@@ -205,7 +213,7 @@ function Tarot({ onSpread, onDiary, onMenu }: { onSpread: () => void; onDiary: (
       {!card && <p className="lede">Подумайте о том, что сегодня для вас важно, и откройте карту.</p>}
       <div className="stage single altar">
         {shuffling ? (
-          <ShuffleDeck />
+          <ShuffleDeck onStart={shuffleStarted} onDone={shuffleDone} />
         ) : (
           <PixelCard id={cardId} integrity={day?.integrity} animate={justRevealed} label={card && day ? `Карта дня: ${card.name}, целостность ${day.integrity}%` : 'Карта дня, рубашка. Нажмите, чтобы открыть'} onClick={card ? undefined : reveal} />
         )}
@@ -388,7 +396,8 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
     let alive = true
     preloadCards(cards.map((c) => c.id)).then(() => {
       if (!alive) return
-      play('shuffle')
+      // без анимации карты ложатся сразу — один звук на всю раздачу; с анимацией звук даёт каждая карта (onDealAnim)
+      if (prefersReducedMotion()) play('deal')
       setReady(true)
     })
     return () => {
@@ -423,6 +432,10 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
   const many = spread.layout === 'celtic'
   const single = cards.length === 1
   const verdict = kind === 'yesno' ? verdictOf(cards[0].id, integrity[0]) : null
+  // карта вылетает из колоды: звук в момент, когда началась анимация именно этой карты
+  const onDealAnim = (e: AnimationEvent<HTMLElement>) => {
+    if (e.target === e.currentTarget && e.animationName.startsWith('deal')) play('deal')
+  }
   return (
     <section className="screen">
       <ScreenHead title={spread.name} onBack={onBack} />
@@ -434,6 +447,7 @@ function SpreadTable({ kind, question, onBack, onAgain }: { kind: SpreadKind; qu
             key={i}
             className={`slot deal p${i + 1}${i === next ? ' next' : ''}${!open[i] && i !== next ? ' wait' : ''}`}
             style={{ '--i': i } as CSSProperties}
+            onAnimationStart={onDealAnim}
           >
             <PixelCard
               id={open[i] ? c.id : null}
