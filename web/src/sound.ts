@@ -86,7 +86,12 @@ export function setSound(on: boolean) {
   }
   if (on) startDrone()
   else drone?.stop()
+  // звук переключают и в шапке, и на экране входа: пусть обе кнопки знают
+  window.dispatchEvent(new Event(SOUND_EVENT))
 }
+
+/** Событие на window при включении и выключении звука. */
+export const SOUND_EVENT = 'nit-sound'
 
 /** Возобновить гул после перезагрузки: вызывается из первого жеста пользователя. */
 export function resumeSound() {

@@ -84,9 +84,6 @@ export function App() {
         {screen === 'diary' && <Diary onBack={() => go('tarot')} />}
         {screen === 'natal' && <NatalScreen onBack={() => go('menu')} />}
         {screen === 'matrix' && <MatrixScreen onBack={() => go('menu')} />}
-        <p className="disclaimer">
-          Толкования носят рефлексивный и развлекательный характер и не заменяют советы врача, юриста или психолога.
-        </p>
       </main>
       <div className="crt" aria-hidden="true" />
       {booting && <Boot onDone={() => setBooting(false)} />}

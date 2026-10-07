@@ -1,10 +1,15 @@
-import { useMemo, useState } from 'react'
-import { play, setSound, soundEnabled } from '../sound'
+import { useEffect, useMemo, useState } from 'react'
+import { SOUND_EVENT, play, setSound, soundEnabled } from '../sound'
 
 /** Строка статуса сеанса: имя, номер сеанса, «связь» и переключатель звука. */
 export function StatusBar({ onHome }: { onHome: () => void }) {
   const session = useMemo(() => `0x${Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0')}`, [])
   const [sound, setSoundState] = useState(soundEnabled)
+  useEffect(() => {
+    const sync = () => setSoundState(soundEnabled())
+    window.addEventListener(SOUND_EVENT, sync)
+    return () => window.removeEventListener(SOUND_EVENT, sync)
+  }, [])
 
   return (
     <header className="status">
