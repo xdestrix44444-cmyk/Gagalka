@@ -1,4 +1,4 @@
-// Звук «Нити»: всё синтезируется Web Audio, без файлов. По умолчанию выключен, включается кнопкой ♪.
+// Звук «Нити»: всё синтезируется Web Audio, без файлов. По умолчанию включён (до первого касания браузер молчит), выключается кнопкой ♪.
 // Браузеры разрешают звук только после жеста пользователя, поэтому контекст создаётся при включении.
 
 import { SETTINGS_EVENT, loadSettings } from './settings'
@@ -11,9 +11,9 @@ let drone: { stop: () => void } | null = null
 
 export function soundEnabled(): boolean {
   try {
-    return localStorage.getItem(KEY) === '1'
+    return localStorage.getItem(KEY) !== '0'
   } catch {
-    return false
+    return true
   }
 }
 
