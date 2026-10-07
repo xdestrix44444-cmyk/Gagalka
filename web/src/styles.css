@@ -4,7 +4,7 @@
   --bg: #060608;
   --panel: rgba(9, 9, 12, 0.94);
   --fg: #d9d2c3;
-  --muted: #aca495;
+  --muted: #c2baaa;
   --dim: #4a3a33;
   --rust: #b5543c;
   --teal: #3fb3a3;
@@ -30,11 +30,23 @@ body { min-height: 100vh; overflow-x: hidden; }
 ::selection { background: var(--rust); color: var(--bg); }
 
 /* фон и экран: живая тьма под интерфейсом, развёртка и виньетка поверх */
+/* сбой экрана (ui/Haunt.tsx): всё приложение дёргается и расслаивается по цвету; полосы помех поверх */
+html.glitch-split .app { animation: screen-split .3s steps(3, end); }
+@keyframes screen-split {
+  0% { transform: translate(-3px, 0); text-shadow: 2px 0 rgba(181, 84, 60, .7), -2px 0 rgba(63, 179, 163, .7); }
+  34% { transform: translate(2px, 1px) skewX(-1.5deg); text-shadow: -3px 0 rgba(181, 84, 60, .7), 3px 0 rgba(63, 179, 163, .7); }
+  67% { transform: translate(-1px, 0); text-shadow: 1px 0 rgba(181, 84, 60, .5), -1px 0 rgba(63, 179, 163, .5); }
+  100% { transform: none; text-shadow: none; }
+}
+.glitch-bars { position: fixed; inset: 0; z-index: 45; pointer-events: none; }
+.glitch-bars i { position: absolute; left: 0; right: 0; transform: translateX(var(--dx));
+  background: repeating-linear-gradient(90deg, rgba(181, 84, 60, .35) 0 7px, rgba(6, 6, 8, .6) 7px 11px, rgba(63, 179, 163, .3) 11px 15px, rgba(217, 210, 195, .18) 15px 18px);
+  mix-blend-mode: screen; }
 .haunt { position: fixed; inset: 0; width: 100vw; height: 100vh; image-rendering: pixelated; z-index: 0; pointer-events: none; }
 .crt { position: fixed; inset: 0; z-index: 50; pointer-events: none;
   background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.13) 2px 3px),
-    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.65) 100%);
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.07) 2px 3px),
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.5) 100%);
   animation: crt-flicker 6s steps(1, end) infinite; }
 @keyframes crt-flicker { 0%, 96%, 100% { opacity: 1; } 97% { opacity: .82; } 98% { opacity: 1; } 99% { opacity: .9; } }
 
@@ -124,7 +136,7 @@ div.pcard-wrap { cursor: default; }
 /* вопрос к нити */
 .question { display: grid; gap: 6px; font-size: var(--fs-ui); color: var(--muted); }
 .question textarea { font-family: var(--serif); font-size: 1.02rem; color: var(--fg); padding: 2px 4px; resize: vertical; border-radius: 0; caret-color: var(--teal); }
-.question textarea::placeholder { color: #857e72; font-style: italic; }
+.question textarea::placeholder { color: #958e82; font-style: italic; }
 .question textarea:focus-visible { outline: none; border-image-source: var(--frame-teal); }
 .asked { font-family: var(--serif); font-style: italic; text-align: center; color: var(--fg); }
 

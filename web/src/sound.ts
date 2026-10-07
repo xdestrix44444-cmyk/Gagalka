@@ -211,13 +211,13 @@ function online(at: number) {
 
 export type Sfx =
   | 'tap' | 'shuffle' | 'flip' | 'static' | 'corrupt' | 'boot' | 'type' | 'glitch' | 'lag' | 'modem' | 'blink'
-  | 'press' | 'key' | 'back' | 'screen' | 'think' | 'done' | 'deny'
+  | 'press' | 'key' | 'back' | 'screen' | 'think' | 'done' | 'deny' | 'interference'
 
 /** Случайный разброс высоты, чтобы частые звуки не звучали как одна и та же запись. */
 const jitter = (f: number, spread = 0.06) => f * (1 + (Math.random() * 2 - 1) * spread)
 
 /** Жуткие звуки, которые в мягком режиме заменяются спокойными или молчат. */
-const HARSH: Partial<Record<Sfx, Sfx | null>> = { corrupt: 'flip', glitch: null, lag: null, static: null }
+const HARSH: Partial<Record<Sfx, Sfx | null>> = { corrupt: 'flip', glitch: null, lag: null, static: null, interference: null }
 
 export function play(sfx: Sfx) {
   if (!soundEnabled()) return
@@ -261,6 +261,12 @@ export function play(sfx: Sfx) {
       break
     case 'type':
       burst(3200, 6, 0.02, 0.05)
+      break
+    case 'interference':
+      // сбой экрана на фоне: тихий треск помехи, пара цифровых писков и гул срыва кадра
+      burst(jitter(1800, 0.3), 0.7, 0.14, 0.022)
+      for (let i = 0; i < 3; i++) steady(jitter(1400 + Math.random() * 2600, 0.1), 0.012, 0.012, 'square', 0.02 + i * 0.03)
+      tone(jitter(70), 0.16, 0.02, 'sawtooth', 0, 50)
       break
     case 'shuffle':
       for (let i = 0; i < 6; i++) burst(1800 + i * 200, 1.2, 0.12, 0.18, i * 0.17)
