@@ -19,7 +19,14 @@ export function soundEnabled(): boolean {
   }
 }
 
-function audio(): { ctx: AudioContext; out: GainNode } | null {
+/** Отрисовка в файл (ролики): звуки пишутся в чужой контекст в заданный момент, а не играют сейчас. */
+let offline: { ctx: BaseAudioContext; out: AudioNode; at: number } | null = null
+
+/** Текущее время для планирования звука: при отрисовке в файл — момент реплики. */
+const now = (c: BaseAudioContext) => (offline ? offline.at : c.currentTime)
+
+function audio(): { ctx: BaseAudioContext; out: AudioNode } | null {
+  if (offline) return { ctx: offline.ctx, out: offline.out }
   if (!ctx) {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) return null
@@ -35,7 +42,7 @@ function audio(): { ctx: AudioContext; out: GainNode } | null {
   return { ctx, out: master! }
 }
 
-function noiseBuffer(c: AudioContext, seconds: number): AudioBuffer {
+function noiseBuffer(c: BaseAudioContext, seconds: number): AudioBuffer {
   const buf = c.createBuffer(1, Math.ceil(c.sampleRate * seconds), c.sampleRate)
   const d = buf.getChannelData(0)
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1
@@ -110,7 +117,7 @@ function burst(freq: number, q: number, dur: number, vol: number, at = 0) {
   const a = audio()
   if (!a) return
   const { ctx: c, out } = a
-  const t = c.currentTime + at
+  const t = now(c) + at
   const src = c.createBufferSource()
   src.buffer = noiseBuffer(c, dur)
   const bp = c.createBiquadFilter()
@@ -128,7 +135,7 @@ function tone(freq: number, dur: number, vol: number, type: OscillatorType = 'sq
   const a = audio()
   if (!a) return
   const { ctx: c, out } = a
-  const t = c.currentTime + at
+  const t = now(c) + at
   const o = c.createOscillator()
   o.type = type
   o.frequency.setValueAtTime(freq, t)
@@ -146,7 +153,7 @@ function steady(freq: number, dur: number, vol: number, type: OscillatorType = '
   const a = audio()
   if (!a) return
   const { ctx: c, out } = a
-  const t = c.currentTime + at
+  const t = now(c) + at
   const o = c.createOscillator()
   o.type = type
   o.frequency.setValueAtTime(freq, t)
@@ -260,6 +267,29 @@ export function play(sfx: Sfx) {
     if (calm) play(calm)
     return
   }
+  emit(sfx)
+}
+
+/**
+ * Записать звуки приложения в чужой контекст (OfflineAudioContext ролика): каждая реплика — в свой момент
+ * времени и со своей громкостью. Модем здесь не звучит: его запись ролик подмешивает сам.
+ */
+export function renderSfx(c: BaseAudioContext, dest: AudioNode, cues: readonly { sfx: Sfx | 'online'; at: number; vol?: number }[]) {
+  try {
+    for (const cue of cues) {
+      const g = c.createGain()
+      g.gain.value = cue.vol ?? 1
+      g.connect(dest)
+      offline = { ctx: c, out: g, at: cue.at }
+      if (cue.sfx === 'online') online(0)
+      else if (cue.sfx !== 'modem') emit(cue.sfx)
+    }
+  } finally {
+    offline = null
+  }
+}
+
+function emit(sfx: Sfx) {
   switch (sfx) {
     case 'tap':
       tone(jitter(880), 0.04, 0.05)

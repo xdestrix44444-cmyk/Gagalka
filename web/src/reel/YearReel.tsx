@@ -2,6 +2,7 @@
 // поэтому запись идёт кадр за кадром без рывков и всегда получается одинаковой.
 import { useEffect, useRef, type CSSProperties } from 'react'
 import { drawCardBack, drawCardFace } from '../sprites'
+import { signEmblem } from '../natal/emblems'
 import { POSITIONS, type ReelPlan } from './plan'
 import type { Timeline } from './timeline'
 
@@ -37,14 +38,16 @@ function rnd(seed: number) {
   }
 }
 
-const STATE_LABEL = { whole: 'ЦЕЛ', partial: 'ЧАСТИЧНО', damaged: 'ПОВРЕЖДЁН' } as const
+/** Знак на экране соединения и в зацепке: эмблема над именем; при переходе уменьшается и поднимается. */
+const SIGN_AT = { connect: { emblem: 76, top: 262 }, hook: { emblem: 44, top: 116 } }
+
 const STATE_COLOR = { whole: '#3fb3a3', partial: '#e3b25a', damaged: '#ff5a6a' } as const
 const MONTH_SHORT = ['ОКТ', 'НОЯ', 'ДЕК']
 const BOOT_LINES = [
   'НИТЬ.EXE · сборка ████02',
-  '> проверка памяти ......... ОК',
-  '> загрузка колоды ........ 78/78',
-  '> калибровка сигнала ▓▓▓▓▓▓▓▓ 100%',
+  '> память ......... ОК',
+  '> колода ......... 78/78',
+  '> сигнал ▓▓▓▓▓▓▓▓ 100%',
   '> поиск соединения ...',
 ]
 
@@ -65,9 +68,9 @@ interface Rect {
   w: number
 }
 
-const SLOT_W = 84
-const slotRect = (i: number): Rect => ({ x: 40 + i * (SLOT_W + 14), y: 250, w: SLOT_W })
-const CENTER: Rect = { x: 110, y: 160, w: 140 }
+const SLOT_W = 90
+const slotRect = (i: number): Rect => ({ x: 31 + i * (SLOT_W + 14), y: 262, w: SLOT_W })
+const CENTER: Rect = { x: 97.5, y: 146, w: 165 }
 
 /** Карта с переворотом: угол 0 — рубашка, 180 — лицо. Повреждённая лежит вверх ногами. */
 function FlipCard({ id, integrity, reversed, rect, angle, opacity = 1, style }: {
@@ -127,7 +130,7 @@ function Dust({ frame }: { frame: number }) {
   return <canvas ref={ref} className="dust" width={120} height={214} />
 }
 
-/** Сколько символов субтитров напечатано к моменту t: линейно между опорными точками, на паузах стоит. */
+/** Сколько символов субтитров напечатано к моменту t: в темпе голоса между опорными точками, на паузах стоит. */
 function typedAt(subs: [number, number][], t: number): number {
   if (!subs.length || t < subs[0][1]) return 0
   for (let i = 1; i < subs.length; i++) {
@@ -138,21 +141,37 @@ function typedAt(subs: [number, number][], t: number): number {
   return subs[subs.length - 1][0]
 }
 
-/** Субтитры как вывод терминала: текущее предложение печатается в такт голосу, на паузах мигает курсор. */
+/** Примерно столько символов влезает в строку субтитров. */
+const LINE = 32
+
+/**
+ * Субтитры как вывод терминала: текущее предложение печатается в темпе голоса. Предыдущее не стирается сразу:
+ * оно тускнеет и стоит строкой выше, пока новое не заняло целую строку, — сказанное успевают дочитать.
+ */
 function Subtitles({ text, subs, t }: { text: string; subs: [number, number][]; t: number }) {
   const n = typedAt(subs, t)
   if (n <= 0) return null
   const starts = [0]
   for (const m of text.matchAll(/[.!?]\s+/g)) starts.push(m.index! + m[0].length)
-  const from = starts.filter((s) => s <= n - 1).pop() ?? 0
-  const next = starts.find((s) => s > from) ?? text.length
-  const shown = text.slice(from, Math.min(n, next)).trim()
+  const k = starts.filter((s) => s <= n - 1).length - 1
+  const from = starts[k]
+  const next = starts[k + 1] ?? text.length
+  const cur = text.slice(from, Math.min(n, next)).trim()
+  const prev = k > 0 ? text.slice(starts[k - 1], from).trim() : ''
+  const prevFade = 1 - clamp((cur.length - (LINE - 8)) / 8)
   const typing = subs.some(([c, at], i) => i > 0 && t < at && t >= subs[i - 1][1] && subs[i - 1][0] !== c)
   return (
     <div className="subs">
-      <span className="prompt">&gt; </span>
-      {shown}
-      <Cursor t={t} on={typing} />
+      {prev && prevFade > 0 && (
+        <div className="prev" style={{ opacity: 0.45 * prevFade }}>
+          &gt; {prev}
+        </div>
+      )}
+      <div>
+        <span className="prompt">&gt; </span>
+        {cur}
+        <Cursor t={t} on={typing} />
+      </div>
     </div>
   )
 }
@@ -175,8 +194,19 @@ function LoadLine({ c, month, integrity, last, t }: { c: Timeline['cards'][numbe
       </div>
     )
   }
-  const target = c.error ? integrity / 100 : 1
+  const target = c.error || c.noise ? integrity / 100 : 1
   const p = easeOut(span(t, c.load.from, c.load.to)) * target
+  if (c.noise && t >= c.noise.from) {
+    // помехи на линии: полоса рябит, процент скачет
+    const r = rnd(Math.floor(t / 66) * 7 + 5)
+    const junk = Array.from({ length: cells }, () => '▓▒░'[Math.floor(r() * 3)]).join('')
+    return (
+      <div className="load">
+        <div className="warn">&gt; ПОМЕХИ НА ЛИНИИ</div>
+        <div>&gt; ЧТЕНИЕ: {month} {junk} {Math.round(integrity - 6 + r() * 12)}%</div>
+      </div>
+    )
+  }
   return (
     <div className="load">
       {last && <div>&gt; ПОСЛЕДНИЙ ФАЙЛ</div>}
@@ -233,6 +263,7 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
       } else if (since % 1700 < 170) bars = { seed: Math.floor(frame / 2) * 5 + 2, count: 3, tall: 10 }
     }
     if (state === 'partial' && since >= 0 && (since < 200 || since % 2600 < 120)) bars = { seed: Math.floor(frame / 2) * 9 + 4, count: 2, tall: 8 }
+    if (c.noise && t >= c.noise.from && t < c.noise.to + 100 && frame % 3 !== 0) bars = { seed: Math.floor(frame / 2) * 11 + 6, count: 2, tall: 6 }
   }
   const flashing = tl.flash && t >= tl.flash.at && t < tl.flash.at + 67
   if (flashing) bars = { seed: frame * 13, count: 5, tall: 14 }
@@ -257,39 +288,59 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
           <span>{header}</span>
         </div>
 
-        {/* загрузка: запрос со знаком сразу, под ним сыплется лог */}
-        {inBoot && (
+        {/* загрузка: лог сыплется, знак ещё не назван */}
+        {t < b.connected && (
           <>
-            <div className="query">&gt; ЗАПРОС</div>
-            <div className="px gl sign">{sign}</div>
-            {t < b.connected && (
-              <div className="bootlog">
-                {BOOT_LINES.map((line, i) => (t >= b.lines[i] ? <div key={i}>{typed(line, t, b.lines[i], 260)}</div> : null))}
-                {t >= b.lines[b.lines.length - 1] && <Cursor t={t} />}
-              </div>
-            )}
-            {t >= b.connected && (
-              <div className="px gl connected" style={{ opacity: 1 - span(t, b.end - 120, b.end) }}>
-                СОЕДИНЕНИЕ
-                <br />
-                УСТАНОВЛЕНО
-              </div>
-            )}
+            <div className="query">&gt; ВХОДЯЩИЙ ЗАПРОС</div>
+            <div className="bootlog">
+              {BOOT_LINES.map((line, i) => (t >= b.lines[i] ? <div key={i}>{typed(line, t, b.lines[i], 260)}</div> : null))}
+              {t >= b.lines[b.lines.length - 1] && <Cursor t={t} />}
+            </div>
           </>
         )}
 
+        {/* экран соединения: надписи появляются вместе со словами терминала */}
+        {t >= b.connected && t < b.end + 150 && (
+          <div style={{ opacity: 1 - span(t, b.end - 60, b.end + 150) }}>
+            <div className="px gl connected">
+              {(() => {
+                const full = 'СОЕДИНЕНИЕ\nУСТАНОВЛЕНО'
+                const shown = typed(full, t, b.connected, (full.length / Math.max(300, b.connectedEnd - b.connected)) * 1000)
+                return shown
+              })()}
+            </div>
+            {t >= b.query && <div className="ask">{typed('> ЗАПРОС:', t, b.query, 30)}</div>}
+          </div>
+        )}
+
+        {t >= b.sign && t < tl.hook.end && (() => {
+          const m = easeInOut(span(t, b.end + 80, b.end + 480))
+          const size = lerp(SIGN_AT.connect.emblem, SIGN_AT.hook.emblem, m)
+          const top = lerp(SIGN_AT.connect.top, SIGN_AT.hook.top, m)
+          const pop = span(t, b.sign, b.sign + 160)
+          const jolt = t < b.sign + 220 ? (frame % 2 ? 3 : -3) : 0
+          return (
+            <div className="sign-block" style={{ top, opacity: pop, translate: `${jolt}px 0` }}>
+              <img className="emblem" src={signEmblem(plan.sign.index)} alt="" style={{ width: size, height: size }} />
+              <div className="px gl sign">{sign}</div>
+            </div>
+          )
+        })()}
+
         {inHook && (
           <>
-            <div className="px gl sign">{sign}</div>
-            <div className="found">{typed('> НИТЬ НАЙДЕНА', t, b.end, 40)}</div>
-            <div className="px sub" style={{ opacity: span(t, b.end + 400, b.end + 650) }}>НА ОСТАТОК 2026</div>
+            <div className="found">{typed('> НИТЬ НАЙДЕНА', t, b.end + 480, 45)}</div>
+            <div className="px sub" style={{ opacity: span(t, b.end + 700, b.end + 900) }}>НА ОСТАТОК 2026</div>
             {tl.hook.glitch !== null && t >= tl.hook.glitch && (
-              <div className="alert">{typed(`> ЦЕЛОСТНОСТЬ НАРУШЕНА: ${MONTH_SHORT[plan.cards.findIndex((c) => c.state === 'damaged')]}`, t, tl.hook.glitch, 45)}</div>
+              <div className="alert" style={{ color: STATE_COLOR[tl.hook.kind!] }}>
+                {typed(`> ${tl.hook.kind === 'damaged' ? 'ЦЕЛОСТНОСТЬ НАРУШЕНА' : 'ОБНАРУЖЕНЫ ПОМЕХИ'}: ${MONTH_SHORT[tl.hook.worst]}`, t, tl.hook.glitch, 45)}
+              </div>
             )}
             {plan.cards.map((c, i) => {
-              const appear = span(t, b.end + 100 + i * 140, b.end + 400 + i * 140)
+              const appear = span(t, b.end + 60 + i * 40, b.end + 260 + i * 40)
               const r = slotRect(i)
-              const broken = plan.cards[i].state === 'damaged' && tl.hook.glitch !== null && t >= tl.hook.glitch
+              const broken = i === tl.hook.worst && tl.hook.glitch !== null && t >= tl.hook.glitch
+              const rgb = tl.hook.kind === 'damaged' ? '255,90,106' : '227,178,90'
               // вспышка на словах «Целостность нарушена», потом рубашка тлеет красным и изредка дёргается
               const twitch = broken && (t - tl.hook.glitch!) % 700 < 80
               const hit = (hookGlitch || twitch) && broken
@@ -305,13 +356,13 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
                     opacity={appear}
                     style={
                       hit
-                        ? { filter: 'drop-shadow(0 0 10px rgba(255,90,106,.7)) hue-rotate(-30deg) saturate(2)' }
+                        ? { filter: `drop-shadow(0 0 10px rgba(${rgb},.7)) ${tl.hook.kind === 'damaged' ? 'hue-rotate(-30deg)' : 'sepia(.5)'} saturate(2)` }
                         : broken
-                          ? { filter: 'drop-shadow(0 0 6px rgba(255,90,106,.45)) saturate(1.3)' }
+                          ? { filter: `drop-shadow(0 0 6px rgba(${rgb},.45)) saturate(1.3)` }
                           : undefined
                     }
                   />
-                  <span className="px slot-label" style={{ left: r.x, width: r.w, opacity: appear, color: broken ? '#ff5a6a' : undefined }}>
+                  <span className="px slot-label" style={{ left: r.x, width: r.w, opacity: appear, color: broken ? `rgb(${rgb})` : undefined }}>
                     {MONTH_SHORT[i]}
                   </span>
                 </div>
@@ -342,14 +393,13 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
           return (
             <div style={{ opacity: out }}>
               <div className="glow" style={{ opacity: glow * span(t, c.flipEnd - 200, c.flipEnd + 300), background: `radial-gradient(circle, rgba(${glowColor},.22), rgba(181,84,60,.08) 45%, transparent 70%)` }} />
-              <div className="px month" style={{ opacity: span(t, c.start, c.start + 300) }}>{pos.month.toUpperCase()}</div>
-              <div className="meaning" style={{ opacity: span(t, c.start + 100, c.start + 400) }}>{pos.meaning}</div>
+              <div className="month" style={{ opacity: span(t, c.start, c.start + 300) }}>
+                <span className="px">{pos.month.toUpperCase()}</span>
+                <span className="meaning"> · {pos.meaning}</span>
+              </div>
               <FlipCard id={card.id} integrity={card.integrity} reversed={card.state === 'damaged'} rect={{ ...rect, x: rect.x + shake }} angle={angle} />
               <div className={`px name${card.state === 'damaged' ? ' gl' : ''}`} style={{ opacity: shown }}>
-                {card.numeral} · {card.name.toUpperCase()}
-              </div>
-              <div className="state" style={{ opacity: shown, color: STATE_COLOR[card.state] }}>
-                ЦЕЛОСТНОСТЬ {count}% · {STATE_LABEL[card.state]}
+                {card.numeral} · {card.name.toUpperCase()} · <span style={{ color: STATE_COLOR[card.state] }}>{count}%</span>
               </div>
               <LoadLine c={c} month={pos.month.toUpperCase()} integrity={card.integrity} last={cardIdx === 2} t={t} />
               <Subtitles text={texts.cards[cardIdx].voice} subs={c.subs} t={t} />
@@ -367,7 +417,7 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
           const f = tl.final.start
           const L = tl.final.lines
           const rows = [
-            `> ${sign}: 3/3 ФАЙЛА ПРОЧИТАНО`,
+            `> ${sign}: 3/3 ПРОЧИТАНО`,
             '> СОХРАНИТЬ ДО 31.12? [Д/Н]',
             '> АРХИВ ЗНАКОВ: 1/12',
             '> СЛЕДУЮЩИЙ ЗНАК: ',

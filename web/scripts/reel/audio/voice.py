@@ -64,6 +64,9 @@ def gemini(text, path):
                 last = f'{model}: {e.code}'
                 if e.code == 429 and b'PerDay' in e.read(): break  # дневной лимит — сразу к следующей модели
                 time.sleep(30)
+            except urllib.error.URLError as e:
+                last = f'{model}: сеть ({e.reason})'  # сеть моргнула — пробуем ещё раз
+                time.sleep(10)
     raise RuntimeError(f'Озвучка не удалась ({last})')
 
 
@@ -103,7 +106,8 @@ def subtitle_anchors(raw, text, tempo, lead=0.1):
     for (a, b), nxt in zip(segs, segs[1:]):
         done += b - a
         guess = round(n * done / total)
-        near = min(marks, key=lambda m: abs(m - guess), default=None)
+        # конец предложения важнее запятой: пауза в голосе чаще всего на точке
+        near = min(marks, key=lambda m: abs(m - guess) - (8 if text[m - 1] in '.!?' else 0), default=None)
         if near is not None and near > used and abs(near - guess) < 0.15 * n:
             anchors += [(near, b), (near, nxt[0])]; used = near
     anchors.append((n, segs[-1][1]))

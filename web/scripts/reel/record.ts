@@ -23,7 +23,6 @@ const timeline = buildTimeline(voices, plan.cards.map((c) => c.state))
 writeFileSync(join(reel, 'timeline.json'), JSON.stringify(timeline, null, 2))
 console.log(`расписание: ${(timeline.total / 1000).toFixed(1)} с`)
 
-execFileSync(PYTHON, [join(WEB, 'scripts/reel/audio/mix.py'), reel, join(WEB, 'src/sounds/modem.mp3')], { stdio: 'inherit' })
 
 // страница ролика с dev-сервера Vite
 const server = await createServer({ root: WEB, logLevel: 'error', server: { port: 5199, strictPort: false } })
@@ -85,6 +84,10 @@ await cdp('Page.navigate', { url: `${base}reel.html` })
 await loaded
 for (let i = 0; i < 100 && !(await evaluate('!!window.__reelReady')); i++) await new Promise((r) => setTimeout(r, 100))
 await evaluate('window.__reelReady')
+
+// звуки приложения (гул и эффекты) отрисовывает сама страница; голоса и модем подмешивает mix.py
+writeFileSync(join(reel, 'sfx.wav'), Buffer.from(await evaluate('window.__reelAudio()'), 'base64'))
+execFileSync(PYTHON, [join(WEB, 'scripts/reel/audio/mix.py'), reel, join(WEB, 'src/sounds/modem.mp3')], { stdio: 'inherit' })
 
 const out = join(reel, `${plan.sign.slug}.mp4`)
 const ff = spawn(FFMPEG, [

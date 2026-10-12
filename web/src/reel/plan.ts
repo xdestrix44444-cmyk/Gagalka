@@ -6,6 +6,8 @@ import { DECK, integrityState, type IntegrityState } from '../deck'
 import { drawCards } from '../draw'
 
 export interface Sign {
+  /** 0–11: Овен … Рыбы (как эмблемы в natal/emblems). */
+  index: number
   slug: string
   name: string
   /** Кому переслать: «знакомому Раку», «знакомым Близнецам». */
@@ -13,18 +15,18 @@ export interface Sign {
 }
 
 export const SIGNS: readonly Sign[] = [
-  { slug: 'oven', name: 'Овен', to: 'знакомому Овну' },
-  { slug: 'telets', name: 'Телец', to: 'знакомому Тельцу' },
-  { slug: 'bliznetsy', name: 'Близнецы', to: 'знакомым Близнецам' },
-  { slug: 'rak', name: 'Рак', to: 'знакомому Раку' },
-  { slug: 'lev', name: 'Лев', to: 'знакомому Льву' },
-  { slug: 'deva', name: 'Дева', to: 'знакомой Деве' },
-  { slug: 'vesy', name: 'Весы', to: 'знакомым Весам' },
-  { slug: 'skorpion', name: 'Скорпион', to: 'знакомому Скорпиону' },
-  { slug: 'strelets', name: 'Стрелец', to: 'знакомому Стрельцу' },
-  { slug: 'kozerog', name: 'Козерог', to: 'знакомому Козерогу' },
-  { slug: 'vodoley', name: 'Водолей', to: 'знакомому Водолею' },
-  { slug: 'ryby', name: 'Рыбы', to: 'знакомым Рыбам' },
+  { index: 0, slug: 'oven', name: 'Овен', to: 'знакомому Овну' },
+  { index: 1, slug: 'telets', name: 'Телец', to: 'знакомому Тельцу' },
+  { index: 2, slug: 'bliznetsy', name: 'Близнецы', to: 'знакомым Близнецам' },
+  { index: 3, slug: 'rak', name: 'Рак', to: 'знакомому Раку' },
+  { index: 4, slug: 'lev', name: 'Лев', to: 'знакомому Льву' },
+  { index: 5, slug: 'deva', name: 'Дева', to: 'знакомой Деве' },
+  { index: 6, slug: 'vesy', name: 'Весы', to: 'знакомым Весам' },
+  { index: 7, slug: 'skorpion', name: 'Скорпион', to: 'знакомому Скорпиону' },
+  { index: 8, slug: 'strelets', name: 'Стрелец', to: 'знакомому Стрельцу' },
+  { index: 9, slug: 'kozerog', name: 'Козерог', to: 'знакомому Козерогу' },
+  { index: 10, slug: 'vodoley', name: 'Водолей', to: 'знакомому Водолею' },
+  { index: 11, slug: 'ryby', name: 'Рыбы', to: 'знакомым Рыбам' },
 ]
 
 /** Три позиции расклада: месяц как каркас и смысл, который превращает карту в совет. */

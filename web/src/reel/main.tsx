@@ -8,12 +8,15 @@ import '@fontsource/pt-serif/400-italic.css'
 import './reel.css'
 import { preloadCards } from '../sprites'
 import { YearReel, type ReelData } from './YearReel'
+import { renderTrack } from './audio'
 
 declare global {
   interface Window {
     __REEL_DATA__?: ReelData
     __reelReady?: Promise<void>
     __reelSeek?: (ms: number) => Promise<void>
+    /** Гул и эффекты ролика: WAV (2 канала) в base64. */
+    __reelAudio?: () => Promise<string>
   }
 }
 
@@ -25,6 +28,7 @@ if (!data) {
 } else {
   const frame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
   const render = (t: number) => root.render(<YearReel data={data} t={t} />)
+  window.__reelAudio = () => renderTrack(data.timeline)
   window.__reelSeek = async (ms) => {
     flushSync(() => render(ms))
     await frame()

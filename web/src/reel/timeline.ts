@@ -1,4 +1,6 @@
 // Расписание ролика в миллисекундах: и картинка, и звук собираются по нему, поэтому не расходятся.
+import type { Sfx } from '../sound'
+
 // Длины частей берутся из озвучки: терминал озвучивает процесс, диктор читает толкования.
 
 /** Длина файла озвучки и где в нём начинается и кончается речь, в секундах. */
@@ -24,6 +26,8 @@ export interface CardTimes {
   load: { from: number; to: number }
   /** Повреждённая: ошибка чтения, сорвавшийся переворот и быстрая повторная загрузка. */
   error?: { at: number; fail: number; failEnd: number; retryEnd: number }
+  /** Частично целая: полоса рябит помехами с from до to, вместо тишины — треск. */
+  noise?: { from: number; to: number }
   flip: number
   flipEnd: number
   /** Начало субтитров диктора. */
@@ -34,10 +38,11 @@ export interface CardTimes {
 }
 
 export interface Timeline {
-  /** Загрузка: включение кинескопа, строки лога, «соединение установлено». */
-  boot: { on: number; lines: number[]; connected: number; end: number }
-  /** Имя знака и три рубашки; glitch — когда сбоит рубашка повреждённой карты. */
-  hook: { start: number; end: number; glitch: number | null }
+  /** Загрузка: включение кинескопа, строки лога; затем экран соединения, где надписи появляются
+   *  вместе со словами терминала: «Соединение установлено» (connected … connectedEnd), «Запрос:» (query), знак (sign). */
+  boot: { on: number; lines: number[]; connected: number; connectedEnd: number; query: number; sign: number; end: number }
+  /** Имя знака и три рубашки; glitch — когда сбоит рубашка худшей карты (повреждённой, иначе с помехой). */
+  hook: { start: number; end: number; glitch: number | null; worst: number; kind: CardState | null }
   cards: CardTimes[]
   /** Мелькнувшая на два кадра повреждённая карта из следующего месяца. */
   flash: { at: number; card: number } | null
@@ -47,13 +52,16 @@ export interface Timeline {
   total: number
   /** Где в дорожке начинается каждый файл озвучки. */
   voice: { file: string; at: number }[]
-  /** Звуковые эффекты; len — длина, если у эффекта она переменная (модем). */
-  sfx: { kind: SfxKind; at: number; len?: number }[]
+  /** Звуки приложения (sound.ts); modem — запись, len — сколько её звучит. */
+  sfx: { kind: SfxKind; at: number; len?: number; vol?: number }[]
   /** Отрезки тишины перед переворотами: гул на это время пропадает. */
   silence: [number, number][]
 }
 
-export type SfxKind = 'relay' | 'zap' | 'tick' | 'modem' | 'hit' | 'whoosh' | 'flip' | 'fail' | 'corrupt' | 'static' | 'clear' | 'off'
+export type SfxKind = Sfx | 'online'
+
+/** У «corrupt» и «static» в приложении встроена задержка на время переворота (0,64 с). */
+const FLIP_DELAY = 640
 
 export function buildTimeline(v: Voices, states: readonly CardState[]): Timeline {
   const ms = (s: number) => Math.round(s * 1000)
@@ -65,37 +73,55 @@ export function buildTimeline(v: Voices, states: readonly CardState[]): Timeline
   const voice: Timeline['voice'] = []
   const silence: Timeline['silence'] = []
   const sfx: Timeline['sfx'] = [
-    { kind: 'relay', at: 0 },
-    { kind: 'zap', at: 60 },
+    { kind: 'boot', at: 0 },
+    { kind: 'blink', at: 60 },
   ]
 
-  // загрузка: кинескоп 0–400, лог сыплется по строке в 0,11 с, на 1500 — соединение
+  // загрузка: кинескоп 0–400, лог сыплется по строке в 0,11 с; на 1500 терминал начинает «Соединение установлено»
   const lines = [450, 560, 670, 780, 890]
-  const boot = { on: 400, lines, connected: 1500, end: 1800 }
-  lines.forEach((at) => sfx.push({ kind: 'tick', at }))
-  sfx.push({ kind: 'modem', at: 480, len: 1020 }, { kind: 'hit', at: boot.connected })
+  const CONNECT = 1500
+  lines.forEach((at) => sfx.push({ kind: 'key', at }))
 
-  // зацепка: «Соединение установлено. Запрос: … Целостность нарушена»; рубашка вспыхивает на последней фразе
-  const openEnd = say('open', boot.end + 50)
-  const openFile = voice[voice.length - 1].at
+  // первая реплика делится на фразы: «Соединение установлено» / «Запрос:» / знак / состояние
+  const o = v.open
+  const fallback: [number, number][] = [[o.start, o.start + 1.2], [o.start + 1.6, o.start + 2.3], [o.start + 2.7, o.start + 3.1], [o.start + 3.5, o.end]]
+  const segs = o.segs && o.segs.length >= 4 ? o.segs : fallback
+  const openFile = CONNECT - ms(segs[0][0])
+  voice.push({ file: 'open.wav', at: openFile })
+  const at = (k: number, edge: 0 | 1 = 0) => openFile + ms(segs[k][edge])
+  const openEnd = openFile + ms(o.end)
+  const boot = { on: 400, lines, connected: CONNECT, connectedEnd: at(0, 1), query: at(1), sign: at(2), end: at(2, 1) + 250 }
+  sfx.push({ kind: 'modem', at: 480, len: CONNECT - 480 }, { kind: 'online', at: CONNECT - 100 }, { kind: 'glitch', at: boot.sign })
+
+  // зацепка: рубашка худшей карты вспыхивает на последней фразе («Целостность нарушена» / «Обнаружены помехи»)
   const damaged = states.indexOf('damaged')
-  const lastPhrase = v.open.segs?.length ? openFile + ms(v.open.segs[v.open.segs.length - 1][0]) : openEnd - 900
-  const hook = { start: boot.end, end: openEnd + 350, glitch: damaged >= 0 ? lastPhrase : null }
-  if (hook.glitch !== null) sfx.push({ kind: 'static', at: hook.glitch })
+  const worst = damaged >= 0 ? damaged : states.indexOf('partial')
+  const hook = {
+    start: boot.end, end: Math.max(openEnd, at(3, 1)) + 350, glitch: worst >= 0 ? at(3) : null,
+    worst, kind: worst >= 0 ? states[worst] : null,
+  }
+  if (hook.glitch !== null) sfx.push({ kind: 'glitch', at: hook.glitch }, { kind: 'interference', at: hook.glitch + 40 })
 
   const cards: CardTimes[] = []
   let flash: Timeline['flash'] = null
   let t = hook.end
   states.forEach((state, i) => {
     const start = t
-    sfx.push({ kind: 'whoosh', at: start })
+    sfx.push({ kind: 'deal', at: start })
     // чтение файла — быстрая полоса на экране вместе с выездом карты, без голоса
     const from = start + 100
     const to = from + 500
     let flip: number
     let flipMs = i === 2 ? 700 : 640
     let error: CardTimes['error']
-    if (state === 'damaged') {
+    let noise: CardTimes['noise']
+    if (state === 'partial') {
+      // помеха: полоса доходит до процента целостности и рябит, вместо тишины — треск
+      noise = { from: to, to: to + 550 }
+      flip = noise.to + 100
+      sfx.push({ kind: 'interference', at: noise.from }, { kind: 'interference', at: noise.from + 260 }, { kind: 'glitch', at: noise.to - 120 })
+      silence.push([noise.from, flip])
+    } else if (state === 'damaged') {
       // чтение застревает на проценте целостности, карта срывается вместе с «Ошибка. Повторная попытка», быстрый повтор
       const at = to + 50
       const errEnd = say('err', at)
@@ -105,22 +131,25 @@ export function buildTimeline(v: Voices, states: readonly CardState[]): Timeline
       error = { at, fail, failEnd, retryEnd }
       flip = retryEnd + 250
       flipMs = 420
-      sfx.push({ kind: 'fail', at: fail }, { kind: 'tick', at: failEnd + 30 })
+      sfx.push({ kind: 'deny', at: fail }, { kind: 'lag', at: fail + 250 }, { kind: 'key', at: failEnd + 30 })
       silence.push([retryEnd, flip])
     } else {
       flip = Math.max(to, start + 500) + 350
       silence.push([flip - 350, flip])
     }
     const flipEnd = flip + flipMs
-    sfx.push({ kind: 'flip', at: flip + flipMs / 2 }, { kind: 'hit', at: flipEnd })
-    sfx.push({ kind: state === 'damaged' ? 'corrupt' : state === 'partial' ? 'static' : 'clear', at: flipEnd })
+    sfx.push({ kind: 'flip', at: flip })
+    if (state === 'damaged') sfx.push({ kind: 'corrupt', at: flipEnd - FLIP_DELAY }, { kind: 'glitch', at: flipEnd })
+    else if (state === 'partial') sfx.push({ kind: 'static', at: flipEnd - FLIP_DELAY }, { kind: 'interference', at: flipEnd })
+    else sfx.push({ kind: 'done', at: flipEnd })
     const text = flipEnd + 10
     const info = v[`card${i + 1}`]
     const at = text - ms(info.start)
     voice.push({ file: `card${i + 1}.wav`, at })
-    const end = text + ms(info.end - info.start) + 450
+    // после последнего слова текст стоит ещё секунду, чтобы его дочитали
+    const end = text + ms(info.end - info.start) + 1000
     const subs = (info.subs ?? []).map(([c, s]) => [c, at + s] as [number, number])
-    cards.push({ start, load: { from, to }, error, flip, flipEnd, text, end, subs })
+    cards.push({ start, load: { from, to }, error, noise, flip, flipEnd, text, end, subs })
     // повреждённая карта из следующих месяцев мелькает на два кадра посреди первого толкования
     if (i === 0 && damaged > 0) flash = { at: text + 2200, card: damaged }
     t = end
@@ -129,11 +158,11 @@ export function buildTimeline(v: Voices, states: readonly CardState[]): Timeline
   // финал: строки терминала по одной, курсор ждёт ввода, затем кинескоп гаснет
   const fStart = t
   const fLines = [150, 650, 1150, 1650].map((d) => fStart + d)
-  fLines.forEach((at) => sfx.push({ kind: 'tick', at }))
+  fLines.forEach((at) => sfx.push({ kind: 'key', at }))
   const closeEnd = say('close', fStart + 250)
   const fEnd = Math.max(fLines[3] + 1400, closeEnd + 700)
   const off = { start: fEnd, end: fEnd + 600 }
-  sfx.push({ kind: 'off', at: off.start })
+  sfx.push({ kind: 'back', at: off.start }, { kind: 'blink', at: off.end - 120 })
   return {
     boot, hook, cards, flash,
     final: { start: fStart, lines: fLines, end: fEnd },
