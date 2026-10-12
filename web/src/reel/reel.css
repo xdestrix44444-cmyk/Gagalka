@@ -72,3 +72,28 @@ html, body { margin: 0; background: #000; }
 .alert { position: absolute; top: 432px; left: 0; right: 0; text-align: center; font-size: 14px; color: #ff5a6a; letter-spacing: .03em; }
 
 .ask { position: absolute; top: 230px; left: 0; right: 0; text-align: center; font-size: 15px; color: #3fb3a3; letter-spacing: .08em; }
+
+/* трейлер «Камеры»: монохром с бирюзой, как старые камеры наблюдения */
+.trailer .screen { background: #050707; }
+.t-cam { position: absolute; inset: 0; transform-origin: 50% 47%; filter: grayscale(1) sepia(.35) hue-rotate(120deg) saturate(1.7) brightness(.78) contrast(1.15); }
+.t-fan { position: absolute; }
+.t-card { position: absolute; inset: 0; transform-origin: 50% 140%; box-shadow: 0 0 0 1px #233, 0 8px 16px rgba(0, 0, 0, .7); }
+.t-emblem { position: absolute; image-rendering: pixelated; }
+.pz { position: absolute; inset: 0; width: 100%; height: 100%; }
+.snow { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.t-roll { position: absolute; left: 0; right: 0; height: 90px; pointer-events: none; background: linear-gradient(rgba(191, 238, 230, 0), rgba(191, 238, 230, .1), rgba(191, 238, 230, 0)); }
+.t-ch { position: absolute; top: 290px; left: 0; right: 0; text-align: center; font-size: 26px; color: #e8fffb; text-shadow: 0 0 10px rgba(63, 179, 163, .9); }
+.t-osd { position: absolute; top: 90px; left: 18px; right: 18px; display: flex; justify-content: space-between; font-size: 17px; color: #bfeee6; letter-spacing: .08em; text-shadow: 0 0 5px rgba(63, 179, 163, .8); }
+.t-osd .rec { color: #ff5a6a; }
+.t-stamp { position: absolute; left: 18px; bottom: 150px; font-size: 16px; color: #bfeee6; opacity: .85; text-shadow: 0 0 5px rgba(63, 179, 163, .7); }
+.t-zoom { position: absolute; right: 18px; bottom: 150px; font-size: 16px; color: #bfeee6; text-shadow: 0 0 5px rgba(63, 179, 163, .7); }
+.t-nosignal { position: absolute; top: 290px; left: 0; right: 0; text-align: center; font-family: 'Press Start 2P', monospace; font-size: 16px; color: #e8fffb; background: rgba(0, 0, 0, .55); padding: 14px 0; }
+.t-term { position: absolute; top: 290px; left: 28px; right: 16px; font-size: 18px; color: #bfeee6; text-shadow: 0 0 8px rgba(63, 179, 163, .8); }
+.t-title { position: absolute; top: 296px; left: 0; right: 0; text-align: center; font-size: 30px; color: #d9d2c3; }
+.t-vignette { background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, .22) 2px 3px), radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 42%, rgba(0, 0, 0, .85) 100%); }
+.t-ring { position: absolute; inset: 0; transform-origin: 180px 309px; }
+.t-track { position: absolute; width: 120px; height: 120px; box-shadow: 0 0 0 1px rgba(191, 238, 230, .8); }
+.t-track::before, .t-track::after { content: ''; position: absolute; left: 50%; top: 50%; background: rgba(191, 238, 230, .8); }
+.t-track::before { width: 14px; height: 1px; margin-left: -7px; }
+.t-track::after { width: 1px; height: 14px; margin-top: -7px; }
+.t-track span { position: absolute; top: -18px; left: 0; font-size: 11px; color: #bfeee6; letter-spacing: .1em; }

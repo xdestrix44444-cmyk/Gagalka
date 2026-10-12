@@ -9,10 +9,12 @@ import './reel.css'
 import { preloadCards } from '../sprites'
 import { YearReel, type ReelData } from './YearReel'
 import { renderTrack } from './audio'
+import { TrailerReel, emblemImage, faceCanvas, type TrailerData } from './TrailerReel'
+import { DEATH, DEVIL, TOWER } from './trailer'
 
 declare global {
   interface Window {
-    __REEL_DATA__?: ReelData
+    __REEL_DATA__?: ReelData | TrailerData
     __reelReady?: Promise<void>
     __reelSeek?: (ms: number) => Promise<void>
     /** Гул и эффекты ролика: WAV (2 канала) в base64. */
@@ -25,6 +27,22 @@ const root = createRoot(document.getElementById('root')!)
 
 if (!data) {
   root.render(<p style={{ color: '#c2baaa', padding: 16 }}>Нет данных ролика: страницу открывает скрипт записи.</p>)
+} else if ('kind' in data) {
+  // трейлер: звук целиком собирает trailer_mix.py, странице нужно только показывать кадры
+  const frame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+  const render = (t: number) => root.render(<TrailerReel data={data} t={t} />)
+  window.__reelSeek = async (ms) => {
+    flushSync(() => render(ms))
+    await frame()
+  }
+  window.__reelReady = (async () => {
+    render(0)
+    await preloadCards([DEVIL, TOWER, DEATH], 15000)
+    ;[DEVIL, TOWER, DEATH, -1].forEach(faceCanvas)
+    await Promise.all(Array.from({ length: 12 }, (_, i) => emblemImage(i).decode().catch(() => undefined)))
+    await document.fonts.ready
+    await new Promise((r) => setTimeout(r, 800))
+  })()
 } else {
   const frame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
   const render = (t: number) => root.render(<YearReel data={data} t={t} />)

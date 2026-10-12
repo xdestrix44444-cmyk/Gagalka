@@ -44,8 +44,15 @@ def main(reel, modem_path):
     put(sfx, 0, SFX_PEAK * 0.89 / peak)
     for s in tl['sfx']:
         if s['kind'] == 'modem': put(modem(modem_path, s['at'], s.get('len', 250)), s['at'], MODEM_GAIN)
+    files = {}
     for v in tl['voice']:
-        put(load(os.path.join(reel, 'voice', v['file'])), v['at'], 1.0)
+        x = files.setdefault(v['file'], load(os.path.join(reel, 'voice', v['file'])))
+        if 'from' in v:
+            # кусок реплики: от начала фразы до следующей, хвост эха мягко гасится
+            x = x[int(v['from'] * SR):int(v['to'] * SR)]
+            n = len(x); r = int(min(0.25 * SR, n / 3))
+            x = [s * min(1, (n - i) / r) for i, s in enumerate(x)]
+        put(x, v['at'], 1.0)
     save(os.path.join(reel, 'audio.wav'), out)
     print('дорожка', round(total / SR, 2), 'с; гул ×%.2f, эффекты ×%.2f' % (DRONE_RMS / rms, SFX_PEAK * 0.89 / peak))
 

@@ -17,17 +17,17 @@ export interface ReelData {
   timeline: Timeline
 }
 
-const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v))
+export const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v))
 /** Доля пройденного отрезка [a, b]. */
-const span = (t: number, a: number, b: number) => clamp((t - a) / (b - a))
-const easeOut = (p: number) => 1 - (1 - p) ** 3
-const easeInOut = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2)
-const lerp = (a: number, b: number, p: number) => a + (b - a) * p
+export const span = (t: number, a: number, b: number) => clamp((t - a) / (b - a))
+export const easeOut = (p: number) => 1 - (1 - p) ** 3
+export const easeInOut = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2)
+export const lerp = (a: number, b: number, p: number) => a + (b - a) * p
 /** Строка, которая печатается с момента t0 со скоростью cps символов в секунду. */
-const typed = (s: string, t: number, t0: number, cps = 60) => (t < t0 ? '' : s.slice(0, Math.floor(((t - t0) / 1000) * cps)))
+export const typed = (s: string, t: number, t0: number, cps = 60) => (t < t0 ? '' : s.slice(0, Math.floor(((t - t0) / 1000) * cps)))
 
 /** Детерминированный шум по номеру кадра: помехи одинаковы при каждой записи. */
-function rnd(seed: number) {
+export function rnd(seed: number) {
   let a = seed >>> 0
   return () => {
     a = (a + 0x6d2b79f5) >>> 0
@@ -52,7 +52,7 @@ const BOOT_LINES = [
 ]
 
 /** Холст рубашки или лица карты; рисуется один раз, дальше только двигается. */
-function CardSide({ id, integrity, face, style }: { id: number; integrity: number; face: boolean; style?: CSSProperties }) {
+export function CardSide({ id, integrity, face, style }: { id: number; integrity: number; face: boolean; style?: CSSProperties }) {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     if (!ref.current) return
@@ -300,8 +300,8 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
         )}
 
         {/* экран соединения: надписи появляются вместе со словами терминала */}
-        {t >= b.connected && t < b.end + 150 && (
-          <div style={{ opacity: 1 - span(t, b.end - 60, b.end + 150) }}>
+        {t >= b.connected && t < b.end + 250 && (
+          <div style={{ opacity: 1 - span(t, b.end - 100, b.end + 250) }}>
             <div className="px gl connected">
               {(() => {
                 const full = 'СОЕДИНЕНИЕ\nУСТАНОВЛЕНО'
@@ -314,7 +314,7 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
         )}
 
         {t >= b.sign && t < tl.hook.end && (() => {
-          const m = easeInOut(span(t, b.end + 80, b.end + 480))
+          const m = easeInOut(span(t, b.end + 100, b.end + 800))
           const size = lerp(SIGN_AT.connect.emblem, SIGN_AT.hook.emblem, m)
           const top = lerp(SIGN_AT.connect.top, SIGN_AT.hook.top, m)
           const pop = span(t, b.sign, b.sign + 160)
@@ -329,15 +329,15 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
 
         {inHook && (
           <>
-            <div className="found">{typed('> НИТЬ НАЙДЕНА', t, b.end + 480, 45)}</div>
-            <div className="px sub" style={{ opacity: span(t, b.end + 700, b.end + 900) }}>НА ОСТАТОК 2026</div>
+            <div className="found">{typed('> НИТЬ НАЙДЕНА', t, b.end + 800, 40)}</div>
+            <div className="px sub" style={{ opacity: span(t, b.end + 1100, b.end + 1350) }}>НА ОСТАТОК 2026</div>
             {tl.hook.glitch !== null && t >= tl.hook.glitch && (
               <div className="alert" style={{ color: STATE_COLOR[tl.hook.kind!] }}>
                 {typed(`> ${tl.hook.kind === 'damaged' ? 'ЦЕЛОСТНОСТЬ НАРУШЕНА' : 'ОБНАРУЖЕНЫ ПОМЕХИ'}: ${MONTH_SHORT[tl.hook.worst]}`, t, tl.hook.glitch, 45)}
               </div>
             )}
             {plan.cards.map((c, i) => {
-              const appear = span(t, b.end + 60 + i * 40, b.end + 260 + i * 40)
+              const appear = span(t, b.end + 500 + i * 150, b.end + 1000 + i * 150)
               const r = slotRect(i)
               const broken = i === tl.hook.worst && tl.hook.glitch !== null && t >= tl.hook.glitch
               const rgb = tl.hook.kind === 'damaged' ? '255,90,106' : '227,178,90'

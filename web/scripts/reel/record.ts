@@ -2,12 +2,13 @@
 // npx tsx scripts/reel/record.ts <папка ролика>   (FFMPEG — путь к ffmpeg, PYTHON — к python3)
 // В папке должны быть plan.json, texts.json и voice/ (scripts/reel/audio/voice.py).
 import { spawn, execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer } from 'vite'
 import { buildTimeline, type Voices } from '../../src/reel/timeline'
 import type { ReelPlan } from '../../src/reel/plan'
+import { buildTrailer } from '../../src/reel/trailer'
 
 const FPS = 30
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
@@ -16,10 +17,13 @@ const PYTHON = process.env.PYTHON ?? 'python3'
 const WEB = resolve(import.meta.dirname, '../..')
 
 const reel = resolve(process.argv[2] ?? '')
-const plan: ReelPlan = JSON.parse(readFileSync(join(reel, 'plan.json'), 'utf8'))
-const texts = JSON.parse(readFileSync(join(reel, 'texts.json'), 'utf8'))
+// в папке трейлера нет расклада (plan.json): у него своё расписание и своё сведение звука
+const trailer = !existsSync(join(reel, 'plan.json'))
 const voices: Voices = JSON.parse(readFileSync(join(reel, 'voice', 'durations.json'), 'utf8'))
-const timeline = buildTimeline(voices, plan.cards.map((c) => c.state))
+const plan: ReelPlan | null = trailer ? null : JSON.parse(readFileSync(join(reel, 'plan.json'), 'utf8'))
+const texts = JSON.parse(readFileSync(join(reel, 'texts.json'), 'utf8'))
+const timeline = plan ? buildTimeline(voices, plan.cards.map((c) => c.state)) : buildTrailer(voices)
+const pageData = plan ? { plan, texts, timeline } : { kind: 'trailer', timeline }
 writeFileSync(join(reel, 'timeline.json'), JSON.stringify(timeline, null, 2))
 console.log(`расписание: ${(timeline.total / 1000).toFixed(1)} с`)
 
@@ -78,18 +82,20 @@ events.push((m) => {
   if (m.method === 'Runtime.exceptionThrown') console.error('страница:', m.params.exceptionDetails.exception?.description)
 })
 await cdp('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 3, mobile: false })
-await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `window.__REEL_DATA__ = ${JSON.stringify({ plan, texts, timeline })};` })
+await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `window.__REEL_DATA__ = ${JSON.stringify(pageData)};` })
 const loaded = new Promise((r) => events.push((m) => m.method === 'Page.loadEventFired' && r(null)))
 await cdp('Page.navigate', { url: `${base}reel.html` })
 await loaded
 for (let i = 0; i < 100 && !(await evaluate('!!window.__reelReady')); i++) await new Promise((r) => setTimeout(r, 100))
 await evaluate('window.__reelReady')
 
-// звуки приложения (гул и эффекты) отрисовывает сама страница; голоса и модем подмешивает mix.py
-writeFileSync(join(reel, 'sfx.wav'), Buffer.from(await evaluate('window.__reelAudio()'), 'base64'))
-execFileSync(PYTHON, [join(WEB, 'scripts/reel/audio/mix.py'), reel, join(WEB, 'src/sounds/modem.mp3')], { stdio: 'inherit' })
+if (plan) {
+  // звуки приложения (гул и эффекты) отрисовывает сама страница; голоса и модем подмешивает mix.py
+  writeFileSync(join(reel, 'sfx.wav'), Buffer.from(await evaluate('window.__reelAudio()'), 'base64'))
+  execFileSync(PYTHON, [join(WEB, 'scripts/reel/audio/mix.py'), reel, join(WEB, 'src/sounds/modem.mp3')], { stdio: 'inherit' })
+} else execFileSync(PYTHON, [join(WEB, 'scripts/reel/audio/trailer_mix.py'), reel], { stdio: 'inherit' })
 
-const out = join(reel, `${plan.sign.slug}.mp4`)
+const out = join(reel, `${plan ? plan.sign.slug : 'trailer'}.mp4`)
 const ff = spawn(FFMPEG, [
   '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
   '-i', join(reel, 'audio.wav'), '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p',
@@ -110,7 +116,7 @@ await new Promise((r) => ff.on('close', r))
 console.log(`\rкадры ${frames}/${frames} за ${((Date.now() - started) / 1000).toFixed(0)} с`)
 
 // обложка: кадр с именем знака и тремя рубашками
-await evaluate(`window.__reelSeek(${timeline.hook.end - 300})`)
+await evaluate(`window.__reelSeek(${'hook' in timeline ? timeline.hook.end - 300 : 6000})`)
 writeFileSync(join(reel, 'cover.jpg'), await shot())
 
 ws.close()
