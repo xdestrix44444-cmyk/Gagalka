@@ -8,7 +8,7 @@ from fx import SR, load, save, pad, stutter, second_phrase, band, crush, mix
 from dark import dark_reverb, bed, drone
 from pa import loudspeaker
 
-TTS_MODELS = tuple(os.environ.get('TTS_MODELS', 'gemini-2.5-flash-preview-tts,gemini-3.1-flash-tts-preview').split(','))
+TTS_MODELS = tuple(os.environ.get('TTS_MODELS', 'gemini-3.1-flash-tts-preview,gemini-2.5-flash-preview-tts,gemini-3.8-flash-tts').split(','))
 NARRATOR = 'Erinome'
 TEMPO = 1.32
 

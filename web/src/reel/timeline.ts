@@ -42,7 +42,13 @@ export interface Timeline {
    *  вместе со словами терминала: «Соединение установлено» (connected … connectedEnd), «Запрос:» (query), знак (sign). */
   boot: { on: number; lines: number[]; connected: number; connectedEnd: number; query: number; sign: number; end: number }
   /** Имя знака и три рубашки; glitch — когда сбоит рубашка худшей карты (повреждённой, иначе с помехой). */
-  hook: { start: number; end: number; glitch: number | null; worst: number; kind: CardState | null }
+  hook: {
+    start: number; end: number; glitch: number | null; worst: number; kind: CardState | null
+    /** Когда печатается строка состояния (вместе со второй фразой, если она есть). */
+    alert: number
+    /** Все карты целые: рубашки гаснут и гул пропадает с at до end. */
+    quiet: { at: number; end: number } | null
+  }
   cards: CardTimes[]
   /** Мелькнувшая на два кадра повреждённая карта из следующего месяца. */
   flash: { at: number; card: number } | null
@@ -104,14 +110,33 @@ export function buildTimeline(v: Voices, states: readonly CardState[]): Timeline
   const boot = { on: 400, lines, connected: CONNECT, connectedEnd: CONNECT + dur(0), query, sign, end: signEnd + 1000 }
   sfx.push({ kind: 'modem', at: 480, len: CONNECT - 480 }, { kind: 'online', at: CONNECT - 100 }, { kind: 'glitch', at: sign })
 
-  // зацепка: состояние звучит, когда рубашки легли; рубашка худшей карты вспыхивает на этих словах
+  // зацепка: состояние звучит, когда рубашки легли; рубашка худшей карты вспыхивает на этих словах.
+  // Если состояние из двух фраз («Помех нет. Состояние линии: тишина»), вторая идёт после паузы
   const status = boot.end + 1700
-  phrase(3, null, status)
+  const last = segs.length - 1
+  let statusEnd: number
+  let second = status
+  if (segs.length > 5) {
+    phrase(3, 4, status)
+    second = status + dur(3) + 500
+    phrase(4, null, second)
+    statusEnd = second + ms(segs[last][1] - segs[4][0])
+  } else {
+    phrase(3, null, status)
+    statusEnd = status + ms(segs[last][1] - segs[3][0])
+  }
   const damaged = states.indexOf('damaged')
   const worst = damaged >= 0 ? damaged : states.indexOf('partial')
+  // все карты целые: на последнем слове состояния рубашки гаснут и гул пропадает на секунду
+  let quiet: Timeline['hook']['quiet'] = null
+  if (worst < 0) {
+    const at = second + ms(segs[last][0] - segs[segs.length > 5 ? 4 : 3][0])
+    quiet = { at, end: at + 1000 }
+    silence.push([at, at + 1000])
+  }
   const hook = {
-    start: boot.end, end: status + dur(3) + 1500, glitch: worst >= 0 ? status : null,
-    worst, kind: worst >= 0 ? states[worst] : null,
+    start: boot.end, end: Math.max(statusEnd + 1500, quiet ? quiet.end + 1200 : 0), glitch: worst >= 0 ? status : null,
+    worst, kind: worst >= 0 ? states[worst] : null, alert: second, quiet,
   }
 
   const cards: CardTimes[] = []

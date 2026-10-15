@@ -9,6 +9,10 @@ import type { Timeline } from './timeline'
 export interface ReelTexts {
   terminal: Record<string, string>
   cards: { screen: string; voice: string }[]
+  /** Строка состояния в зацепке, например «ШУМ ЛИНИИ: 0%»; без неё — по худшей карте. */
+  alert?: string
+  /** Сколько знаков уже в архиве: «3/12». */
+  archive?: string
 }
 
 export interface ReelData {
@@ -331,13 +335,19 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
           <>
             <div className="found">{typed('> НИТЬ НАЙДЕНА', t, b.end + 800, 40)}</div>
             <div className="px sub" style={{ opacity: span(t, b.end + 1100, b.end + 1350) }}>НА ОСТАТОК 2026</div>
-            {tl.hook.glitch !== null && t >= tl.hook.glitch && (
-              <div className="alert" style={{ color: STATE_COLOR[tl.hook.kind!] }}>
-                {typed(`> ${tl.hook.kind === 'damaged' ? 'ЦЕЛОСТНОСТЬ НАРУШЕНА' : 'ОБНАРУЖЕНЫ ПОМЕХИ'}: ${MONTH_SHORT[tl.hook.worst]}`, t, tl.hook.glitch, 45)}
+            {(tl.hook.glitch !== null || texts.alert) && t >= tl.hook.alert && (
+              <div className="alert" style={{ color: STATE_COLOR[tl.hook.kind ?? 'whole'] }}>
+                {typed(
+                  `> ${texts.alert ?? `${tl.hook.kind === 'damaged' ? 'ЦЕЛОСТНОСТЬ НАРУШЕНА' : 'ОБНАРУЖЕНЫ ПОМЕХИ'}: ${MONTH_SHORT[tl.hook.worst]}`}`,
+                  t, tl.hook.alert, 45,
+                )}
               </div>
             )}
             {plan.cards.map((c, i) => {
-              const appear = span(t, b.end + 500 + i * 150, b.end + 1000 + i * 150)
+              // тишина: рубашки гаснут разом и медленно возвращаются
+              const q = tl.hook.quiet
+              const dim = q ? Math.max(span(t, q.at, q.at + 120) - span(t, q.end, q.end + 800), 0) * 0.94 : 0
+              const appear = span(t, b.end + 500 + i * 150, b.end + 1000 + i * 150) * (1 - dim)
               const r = slotRect(i)
               const broken = i === tl.hook.worst && tl.hook.glitch !== null && t >= tl.hook.glitch
               const rgb = tl.hook.kind === 'damaged' ? '255,90,106' : '227,178,90'
@@ -419,7 +429,7 @@ export function YearReel({ data, t }: { data: ReelData; t: number }) {
           const rows = [
             `> ${sign}: 3/3 ПРОЧИТАНО`,
             '> СОХРАНИТЬ ДО 31.12? [Д/Н]',
-            '> АРХИВ ЗНАКОВ: 1/12',
+            `> АРХИВ ЗНАКОВ: ${texts.archive ?? '1/12'}`,
             '> СЛЕДУЮЩИЙ ЗНАК: ',
           ]
           return (
