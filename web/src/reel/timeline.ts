@@ -116,11 +116,14 @@ export function buildTimeline(v: Voices, states: readonly CardState[]): Timeline
   const last = segs.length - 1
   let statusEnd: number
   let second = status
+  // вторая фраза начинается после самой длинной паузы внутри состояния — на конце предложения
+  let split = 0
+  for (let k = 4; k <= last; k++) if (!split || segs[k][0] - segs[k - 1][1] > segs[split][0] - segs[split - 1][1]) split = k
   if (segs.length > 5) {
-    phrase(3, 4, status)
-    second = status + dur(3) + 500
-    phrase(4, null, second)
-    statusEnd = second + ms(segs[last][1] - segs[4][0])
+    phrase(3, split, status)
+    second = status + ms(segs[split - 1][1] - segs[3][0]) + 500
+    phrase(split, null, second)
+    statusEnd = second + ms(segs[last][1] - segs[split][0])
   } else {
     phrase(3, null, status)
     statusEnd = status + ms(segs[last][1] - segs[3][0])
@@ -130,7 +133,7 @@ export function buildTimeline(v: Voices, states: readonly CardState[]): Timeline
   // все карты целые: на последнем слове состояния рубашки гаснут и гул пропадает на секунду
   let quiet: Timeline['hook']['quiet'] = null
   if (worst < 0) {
-    const at = second + ms(segs[last][0] - segs[segs.length > 5 ? 4 : 3][0])
+    const at = second + ms(segs[last][0] - segs[segs.length > 5 ? split : 3][0])
     quiet = { at, end: at + 1000 }
     silence.push([at, at + 1000])
   }
